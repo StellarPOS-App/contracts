@@ -36,7 +36,7 @@ jobs:
       - run: cargo build --workspace --target wasm32v1-none --release
       - name: Report sizes
         run: ls -l target/wasm32v1-none/release/*.wasm
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: contracts-wasm
           path: target/wasm32v1-none/release/*.wasm

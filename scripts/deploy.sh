@@ -57,6 +57,7 @@ TREASURY="$(deploy treasury)"
 PROCESSOR="$(deploy payment_processor)"
 LOYALTY="$(deploy loyalty_program)"
 ESCROW="$(deploy escrow_service)"
+STREAMS="$(deploy payment_stream)"
 
 echo "Initializing"
 invoke "$REGISTRY"  initialize --admin "$ADMIN"
@@ -64,6 +65,7 @@ invoke "$TREASURY"  initialize --signers "[\"$ADMIN\"]" --threshold 1
 invoke "$PROCESSOR" initialize --admin "$ADMIN" --registry "$REGISTRY" --treasury "$TREASURY" --fee_bps "$FEE_BPS"
 invoke "$LOYALTY"   initialize --admin "$ADMIN"
 invoke "$ESCROW"    initialize --admin "$ADMIN"
+invoke "$STREAMS"   initialize --admin "$ADMIN"
 
 echo "Wiring loyalty accrual into the payment processor"
 invoke "$LOYALTY"   set_processor --processor "$PROCESSOR"
@@ -82,7 +84,8 @@ cat > "$OUT" <<JSON
     "paymentProcessor": "$PROCESSOR",
     "loyaltyProgram": "$LOYALTY",
     "treasury": "$TREASURY",
-    "escrowService": "$ESCROW"
+    "escrowService": "$ESCROW",
+    "paymentStream": "$STREAMS"
   }
 }
 JSON

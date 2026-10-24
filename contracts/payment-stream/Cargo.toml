@@ -1,0 +1,18 @@
+[package]
+name = "payment-stream"
+description = "Per-second payment streams for subscriptions, rent and payroll"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+doctest = false
+
+[dependencies]
+soroban-sdk = { workspace = true }
+shared = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }

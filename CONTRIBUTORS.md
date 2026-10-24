@@ -15,6 +15,8 @@ real accounts only.
 | [@springswell](https://github.com/springswell) | One registry call per payment (-7.5% CPU) (#24) |
 | [@Smoothjane](https://github.com/Smoothjane) | Atomic batch payments (#25) |
 | [@Temi-suwa18](https://github.com/Temi-suwa18) | Payment processor allowlist for loyalty (#26) |
+| [@chonilius](https://github.com/chonilius) | Payment streams contract (#28) |
+| [@onejasonn](https://github.com/onejasonn) | Treasury yield vaults (#29) |
 
 ## Forks
 

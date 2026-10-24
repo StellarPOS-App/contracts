@@ -24,8 +24,11 @@ flowchart LR
 - The **payment processor** is the only contract that calls others. It reads
   the registry and, when configured, calls the loyalty program.
 - The **loyalty program** accepts `accrue` only from the merchant itself or
-  from the processor address set by its admin. When the processor calls,
-  Soroban authorizes the calling contract automatically.
+  from a processor on its allowlist (`add_processor` / `remove_processor`,
+  at most 5). Several processors can be allowed at once, so a new one can
+  go live before the old one is retired, and revocation takes effect
+  immediately. When a processor calls, Soroban authorizes the calling
+  contract automatically.
 - The **treasury** is just a recipient from the processor's point of view. It
   never calls out except to pay approved withdrawals.
 - The **escrow service** is standalone. It is used for orders that are not

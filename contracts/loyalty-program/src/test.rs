@@ -161,3 +161,70 @@ fn pause_halts_accrual() {
         Err(Ok(LoyaltyError::Paused))
     );
 }
+
+#[test]
+fn several_processors_can_accrue_and_revocation_is_immediate() {
+    let s = setup();
+    let old = Address::generate(&s.env);
+    let new = Address::generate(&s.env);
+    s.client.add_processor(&old);
+    s.client.add_processor(&new);
+    s.client.add_processor(&new); // no-op
+    assert_eq!(s.client.processors().len(), 2);
+
+    assert_eq!(s.client.accrue(&old, &s.merchant, &s.customer, &UNIT), 10);
+    assert_eq!(s.client.accrue(&new, &s.merchant, &s.customer, &UNIT), 10);
+
+    s.client.remove_processor(&old);
+    assert_eq!(
+        s.client.try_accrue(&old, &s.merchant, &s.customer, &UNIT),
+        Err(Ok(LoyaltyError::Unauthorized))
+    );
+    assert_eq!(s.client.accrue(&new, &s.merchant, &s.customer, &UNIT), 10);
+    assert_eq!(
+        s.client.try_remove_processor(&old),
+        Err(Ok(LoyaltyError::ProcessorNotFound))
+    );
+}
+
+#[test]
+fn processor_allowlist_is_capped() {
+    let s = setup();
+    for _ in 0..MAX_PROCESSORS {
+        s.client.add_processor(&Address::generate(&s.env));
+    }
+    assert_eq!(
+        s.client.try_add_processor(&Address::generate(&s.env)),
+        Err(Ok(LoyaltyError::TooManyProcessors))
+    );
+}
+
+#[test]
+fn set_processor_still_works_as_an_alias() {
+    let s = setup();
+    let p = Address::generate(&s.env);
+    s.client.set_processor(&p);
+    assert_eq!(s.client.processors(), soroban_sdk::vec![&s.env, p.clone()]);
+    assert_eq!(s.client.accrue(&p, &s.merchant, &s.customer, &UNIT), 10);
+}
+
+#[test]
+fn processor_written_by_the_old_version_is_still_honored() {
+    let s = setup();
+    let legacy = Address::generate(&s.env);
+    // Simulate storage left by the pre-allowlist contract.
+    s.env.as_contract(&s.client.address, || {
+        s.env.storage().instance().set(&DataKey::Processor, &legacy);
+    });
+    assert_eq!(
+        s.client.accrue(&legacy, &s.merchant, &s.customer, &UNIT),
+        10
+    );
+
+    // The first change migrates it into the allowlist.
+    let new = Address::generate(&s.env);
+    s.client.add_processor(&new);
+    assert_eq!(s.client.processors().len(), 2);
+    s.client.remove_processor(&legacy);
+    assert_eq!(s.client.processors(), soroban_sdk::vec![&s.env, new]);
+}

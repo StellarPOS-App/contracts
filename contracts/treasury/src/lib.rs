@@ -43,6 +43,8 @@ pub enum TreasuryError {
     InsufficientBalance = 13,
     SignerExists = 14,
     Cancelled = 15,
+    VaultNotApproved = 16,
+    TooManyVaults = 17,
 }
 
 #[contracttype]
@@ -53,6 +55,31 @@ pub enum Action {
     RemoveSigner(Address),
     SetThreshold(u32),
     Unfreeze,
+    /// Allow a yield vault to receive treasury deposits.
+    ApproveVault(Address),
+    /// Stop new deposits into a vault (withdrawing stays possible).
+    RevokeVault(Address),
+    /// Deposit (vault, token, amount) into an approved vault.
+    VaultDeposit(Address, Address, i128),
+    /// Redeem (vault, shares) back into the treasury.
+    VaultWithdraw(Address, i128),
+}
+
+/// Most vaults approved at once.
+pub const MAX_VAULTS: u32 = 5;
+
+/// The interface a yield vault must implement (ERC-4626 style). The
+/// treasury only ever calls these three functions.
+#[allow(dead_code)]
+#[soroban_sdk::contractclient(name = "VaultClient")]
+pub trait VaultInterface {
+    /// Pulls `amount` of the vault's token from `from` (via allowance) and
+    /// returns the shares minted to `from`.
+    fn deposit(env: Env, from: Address, amount: i128) -> i128;
+    /// Burns `shares` of `owner` and pays the underlying to `owner`.
+    fn withdraw(env: Env, owner: Address, shares: i128) -> i128;
+    /// Shares held by `owner`.
+    fn shares(env: Env, owner: Address) -> i128;
 }
 
 #[contracttype]
@@ -84,6 +111,7 @@ enum DataKey {
     Frozen,
     ProposalCount,
     Proposal(u64),
+    Vaults,
 }
 
 #[contractevent]
@@ -164,10 +192,15 @@ impl Treasury {
     ) -> Result<u64, TreasuryError> {
         proposer.require_auth();
         Self::require_signer(&env, &proposer)?;
-        if let Action::Withdraw(_, _, amount) = &action {
-            if *amount <= 0 {
+        match &action {
+            Action::Withdraw(_, _, amount)
+            | Action::VaultDeposit(_, _, amount)
+            | Action::VaultWithdraw(_, amount)
+                if *amount <= 0 =>
+            {
                 return Err(TreasuryError::InvalidAmount);
             }
+            _ => {}
         }
 
         let id: u64 = env
@@ -277,6 +310,46 @@ impl Treasury {
             Action::Unfreeze => {
                 env.storage().instance().set(&DataKey::Frozen, &false);
             }
+            Action::ApproveVault(vault) => {
+                let mut vaults = Self::vaults(env.clone());
+                if !vaults.contains(&vault) {
+                    if vaults.len() >= MAX_VAULTS {
+                        return Err(TreasuryError::TooManyVaults);
+                    }
+                    vaults.push_back(vault);
+                    env.storage().instance().set(&DataKey::Vaults, &vaults);
+                }
+            }
+            Action::RevokeVault(vault) => {
+                let mut vaults = Self::vaults(env.clone());
+                let idx = vaults
+                    .first_index_of(&vault)
+                    .ok_or(TreasuryError::VaultNotApproved)?;
+                vaults.remove(idx);
+                env.storage().instance().set(&DataKey::Vaults, &vaults);
+            }
+            Action::VaultDeposit(vault, token_id, amount) => {
+                if frozen {
+                    return Err(TreasuryError::Frozen);
+                }
+                if !Self::vaults(env.clone()).contains(&vault) {
+                    return Err(TreasuryError::VaultNotApproved);
+                }
+                let this = env.current_contract_address();
+                let token = token::Client::new(&env, &token_id);
+                if token.balance(&this) < amount {
+                    return Err(TreasuryError::InsufficientBalance);
+                }
+                // Allow the vault to pull exactly this amount, for this
+                // ledger only, then deposit. The vault can never take more.
+                token.approve(&this, &vault, &amount, &env.ledger().sequence());
+                VaultClient::new(&env, &vault).deposit(&this, &amount);
+            }
+            Action::VaultWithdraw(vault, shares) => {
+                // Allowed while frozen and for revoked vaults: it only ever
+                // brings funds back into the treasury.
+                VaultClient::new(&env, &vault).withdraw(&env.current_contract_address(), &shares);
+            }
         }
         extend_instance(&env);
 
@@ -340,6 +413,19 @@ impl Treasury {
             .instance()
             .get(&DataKey::Frozen)
             .unwrap_or(false)
+    }
+
+    /// Vaults approved for deposits.
+    pub fn vaults(env: Env) -> Vec<Address> {
+        env.storage()
+            .instance()
+            .get(&DataKey::Vaults)
+            .unwrap_or_else(|| Vec::new(&env))
+    }
+
+    /// Treasury's shares in a vault.
+    pub fn vault_shares(env: Env, vault: Address) -> i128 {
+        VaultClient::new(&env, &vault).shares(&env.current_contract_address())
     }
 
     pub fn balance(env: Env, token_id: Address) -> i128 {
@@ -409,3 +495,5 @@ impl Treasury {
 
 #[cfg(test)]
 mod test;
+#[cfg(test)]
+mod vault_test;

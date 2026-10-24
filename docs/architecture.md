@@ -115,10 +115,18 @@ Every change is a proposal:
 | `RemoveSigner(addr)` | Rejected if signers would drop below threshold |
 | `SetThreshold(n)` | `1 <= n <= signers` |
 | `Unfreeze` | Clears an emergency freeze |
+| `ApproveVault(vault)` / `RevokeVault(vault)` | Allows (up to 5) or stops deposits into a yield vault |
+| `VaultDeposit(vault, token, amount)` | Moves idle funds into an approved vault. Blocked while frozen. |
+| `VaultWithdraw(vault, shares)` | Redeems back into the treasury. Allowed while frozen and after revocation. |
 
 - Execution counts approvals only from **current** signers, so a removed
   signer's earlier approvals stop counting.
 - Proposals expire 7 days after creation.
+- **Yield vaults** implement `deposit(from, amount) -> shares`,
+  `withdraw(owner, shares) -> amount` and `shares(owner)`. A deposit grants
+  the vault an allowance for exactly `amount`, valid for the current ledger
+  only, so a vault can never pull more than the multisig approved.
+  Withdrawals can only pay back into the treasury.
 - `freeze` needs one signer, while `Unfreeze` needs the full threshold.
   Halting withdrawals is cheap; resuming them takes consensus.
 

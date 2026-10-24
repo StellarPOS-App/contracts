@@ -10,6 +10,11 @@ real accounts only.
 | [@presidojay1](https://github.com/presidojay1) | Documentation updates |
 | [@Sadeequ](https://github.com/Sadeequ) | Automated dispute-resolution design for the escrow service (#15) |
 | [@circleboyslimited](https://github.com/circleboyslimited) | Workspace repair, contract rewrites, test suite, CI, and docs |
+| [@prodbycorne](https://github.com/prodbycorne) | Deployment verification tooling and deploy script fixes (#22) |
+| [@richardtoms100](https://github.com/richardtoms100) | Batch approval and rejection for merchant onboarding (#23) |
+| [@springswell](https://github.com/springswell) | One registry call per payment (-7.5% CPU) (#24) |
+| [@Smoothjane](https://github.com/Smoothjane) | Atomic batch payments (#25) |
+| [@Temi-suwa18](https://github.com/Temi-suwa18) | Payment processor allowlist for loyalty (#26) |
 
 ## Forks
 

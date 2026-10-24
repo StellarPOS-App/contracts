@@ -1045,12 +1045,16 @@
                       "key": {
                         "vec": [
                           {
-                            "symbol": "Processor"
+                            "symbol": "Processors"
                           }
                         ]
                       },
                       "val": {
-                        "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARQG5"
+                        "vec": [
+                          {
+                            "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARQG5"
+                          }
+                        ]
                       }
                     }
                   ]

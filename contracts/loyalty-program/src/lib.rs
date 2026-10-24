@@ -20,8 +20,12 @@
 
 use shared::{extend_instance, extend_persistent, BPS_DENOMINATOR};
 use soroban_sdk::{
-    contract, contracterror, contractevent, contractimpl, contracttype, Address, Env,
+    contract, contracterror, contractevent, contractimpl, contracttype, Address, Env, Vec,
 };
+
+/// Most payment processors allowed to accrue at once (e.g. old and new
+/// during an upgrade).
+pub const MAX_PROCESSORS: u32 = 5;
 
 pub const SILVER_THRESHOLD: u64 = 1_000;
 pub const GOLD_THRESHOLD: u64 = 5_000;
@@ -41,6 +45,8 @@ pub enum LoyaltyError {
     InsufficientPoints = 8,
     Unauthorized = 9,
     Overflow = 10,
+    TooManyProcessors = 11,
+    ProcessorNotFound = 12,
 }
 
 #[contracttype]
@@ -108,7 +114,10 @@ pub struct AccountView {
 #[derive(Clone)]
 enum DataKey {
     Admin,
+    /// Single processor written by versions before the allowlist; still
+    /// honored so upgraded deployments keep working.
     Processor,
+    Processors,
     Paused,
     Program(Address),
     Account(Address, Address),
@@ -133,6 +142,14 @@ pub struct PointsRedeemed {
     #[topic]
     pub customer: Address,
     pub points: u64,
+}
+
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ProcessorAccess {
+    #[topic]
+    pub processor: Address,
+    pub allowed: bool,
 }
 
 #[contractevent]
@@ -175,15 +192,68 @@ impl LoyaltyProgram {
         Ok(())
     }
 
-    /// Authorizes a payment processor contract to accrue points on settled
-    /// sales.
-    pub fn set_processor(env: Env, processor: Address) -> Result<(), LoyaltyError> {
+    /// Allows a payment processor contract to accrue points on settled
+    /// sales. Several can be allowed at once, so a new processor can go live
+    /// before the old one is retired. Adding one twice is a no-op.
+    pub fn add_processor(env: Env, processor: Address) -> Result<(), LoyaltyError> {
         Self::admin(&env)?.require_auth();
-        env.storage()
-            .instance()
-            .set(&DataKey::Processor, &processor);
-        extend_instance(&env);
+        let mut list = Self::processors(env.clone());
+        if list.contains(&processor) {
+            return Ok(());
+        }
+        if list.len() >= MAX_PROCESSORS {
+            return Err(LoyaltyError::TooManyProcessors);
+        }
+        list.push_back(processor.clone());
+        Self::save_processors(&env, &list);
+        ProcessorAccess {
+            processor,
+            allowed: true,
+        }
+        .publish(&env);
         Ok(())
+    }
+
+    /// Revokes a processor's access immediately, e.g. after retiring it or
+    /// if it is compromised.
+    pub fn remove_processor(env: Env, processor: Address) -> Result<(), LoyaltyError> {
+        Self::admin(&env)?.require_auth();
+        let mut list = Self::processors(env.clone());
+        let index = list
+            .first_index_of(&processor)
+            .ok_or(LoyaltyError::ProcessorNotFound)?;
+        list.remove(index);
+        Self::save_processors(&env, &list);
+        ProcessorAccess {
+            processor,
+            allowed: false,
+        }
+        .publish(&env);
+        Ok(())
+    }
+
+    /// Backwards-compatible name for add_processor.
+    pub fn set_processor(env: Env, processor: Address) -> Result<(), LoyaltyError> {
+        Self::add_processor(env, processor)
+    }
+
+    /// Processors currently allowed to accrue points.
+    pub fn processors(env: Env) -> Vec<Address> {
+        let mut list: Vec<Address> = env
+            .storage()
+            .instance()
+            .get(&DataKey::Processors)
+            .unwrap_or_else(|| Vec::new(&env));
+        if let Some(legacy) = env
+            .storage()
+            .instance()
+            .get::<_, Address>(&DataKey::Processor)
+        {
+            if !list.contains(&legacy) {
+                list.push_front(legacy);
+            }
+        }
+        list
     }
 
     pub fn pause(env: Env) -> Result<(), LoyaltyError> {
@@ -267,8 +337,7 @@ impl LoyaltyProgram {
     ) -> Result<u64, LoyaltyError> {
         Self::require_not_paused(&env)?;
         caller.require_auth();
-        let processor: Option<Address> = env.storage().instance().get(&DataKey::Processor);
-        if caller != merchant && Some(caller) != processor {
+        if caller != merchant && !Self::processors(env.clone()).contains(&caller) {
             return Err(LoyaltyError::Unauthorized);
         }
         if amount <= 0 {
@@ -406,6 +475,13 @@ impl LoyaltyProgram {
             .instance()
             .get(&DataKey::Admin)
             .ok_or(LoyaltyError::NotInitialized)
+    }
+
+    /// Stores the allowlist and retires the legacy single-processor key.
+    fn save_processors(env: &Env, list: &Vec<Address>) {
+        env.storage().instance().set(&DataKey::Processors, list);
+        env.storage().instance().remove(&DataKey::Processor);
+        extend_instance(env);
     }
 
     fn require_not_paused(env: &Env) -> Result<(), LoyaltyError> {

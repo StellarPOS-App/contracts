@@ -20,16 +20,14 @@ real accounts only.
 
 ## Forks
 
-These 4 accounts have forked `StellarPOS-App/contracts` but have not yet had a
+These 2 accounts have forked `StellarPOS-App/contracts` but have not yet had a
 pull request merged here (several have contributed to the other StellarPOS
 repositories). Once a pull request from a fork is merged, its owner moves to
 the table above. Last updated 24 October 2026.
 
 | GitHub | Fork | Forked on |
 |---|---|---|
-| [@chonilius](https://github.com/chonilius) | [chonilius/stellarPOS-contracts](https://github.com/chonilius/stellarPOS-contracts) | 18 Jun 2026 |
 | [@abayomicornelius](https://github.com/abayomicornelius) | [abayomicornelius/stellarPOS-contracts](https://github.com/abayomicornelius/stellarPOS-contracts) | 18 Jun 2026 |
-| [@onejasonn](https://github.com/onejasonn) | [onejasonn/contracts](https://github.com/onejasonn/contracts) | 4 Oct 2026 |
 | [@Derinsolababy](https://github.com/Derinsolababy) | [Derinsolababy/contracts](https://github.com/Derinsolababy/contracts) | 4 Oct 2026 |
 
 To be added, open a pull request. Your first merged contribution counts.

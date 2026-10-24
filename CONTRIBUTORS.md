@@ -18,21 +18,16 @@ real accounts only.
 
 ## Forks
 
-These 9 accounts have forked `StellarPOS-App/contracts`. Checked on 24 October 2026: none of
-the forks has commits that are not already in `main`, so they are listed here as
-community members rather than code contributors. Once a pull request from a fork is
-merged, its owner moves to the table above.
+These 4 accounts have forked `StellarPOS-App/contracts` but have not yet had a
+pull request merged here (several have contributed to the other StellarPOS
+repositories). Once a pull request from a fork is merged, its owner moves to
+the table above. Last updated 24 October 2026.
 
 | GitHub | Fork | Forked on |
 |---|---|---|
-| [@abayomicornelius](https://github.com/abayomicornelius) | [abayomicornelius/stellarPOS-contracts](https://github.com/abayomicornelius/stellarPOS-contracts) | 18 Jun 2026 |
-| [@abayomiwav](https://github.com/abayomiwav) | [abayomiwav/stellarPOS-contracts](https://github.com/abayomiwav/stellarPOS-contracts) | 18 Jun 2026 |
 | [@chonilius](https://github.com/chonilius) | [chonilius/stellarPOS-contracts](https://github.com/chonilius/stellarPOS-contracts) | 18 Jun 2026 |
-| [@presidojay1](https://github.com/presidojay1) | [presidojay1/stellarPOS-contracts](https://github.com/presidojay1/stellarPOS-contracts) | 18 Jun 2026 |
-| [@prodbycorne](https://github.com/prodbycorne) | [prodbycorne/stellarPOS-contracts](https://github.com/prodbycorne/stellarPOS-contracts) | 18 Jun 2026 |
-| [@Temi-suwa18](https://github.com/Temi-suwa18) | [Temi-suwa18/stellarPOS-contracts](https://github.com/Temi-suwa18/stellarPOS-contracts) | 18 Jun 2026 |
-| [@Derinsolababy](https://github.com/Derinsolababy) | [Derinsolababy/contracts](https://github.com/Derinsolababy/contracts) | 4 Oct 2026 |
+| [@abayomicornelius](https://github.com/abayomicornelius) | [abayomicornelius/stellarPOS-contracts](https://github.com/abayomicornelius/stellarPOS-contracts) | 18 Jun 2026 |
 | [@onejasonn](https://github.com/onejasonn) | [onejasonn/contracts](https://github.com/onejasonn/contracts) | 4 Oct 2026 |
-| [@circleboyslimited](https://github.com/circleboyslimited) | [circleboyslimited/contracts-5](https://github.com/circleboyslimited/contracts-5) | 23 Oct 2026 |
+| [@Derinsolababy](https://github.com/Derinsolababy) | [Derinsolababy/contracts](https://github.com/Derinsolababy/contracts) | 4 Oct 2026 |
 
 To be added, open a pull request. Your first merged contribution counts.

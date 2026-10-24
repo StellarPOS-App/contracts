@@ -19,10 +19,12 @@
 use shared::{extend_instance, extend_persistent, split_fee, MAX_FEE_BPS};
 use soroban_sdk::{
     contract, contractclient, contracterror, contractevent, contractimpl, contracttype, token,
-    Address, Env, String,
+    Address, Env, Map, String, Vec,
 };
 
 pub const MAX_ORDER_REF_LEN: u32 = 64;
+/// Most payments in one pay_batch call, to stay well inside resource limits.
+pub const MAX_BATCH: u32 = 20;
 
 /// The subset of the merchant registry this contract calls.
 #[allow(dead_code)]
@@ -55,6 +57,7 @@ pub enum PaymentError {
     RefundExceedsPayment = 10,
     AlreadyRefunded = 11,
     Overflow = 12,
+    InvalidBatch = 13,
 }
 
 #[contracttype]
@@ -81,6 +84,15 @@ pub struct Payment {
     pub loyalty_points: u64,
     pub status: PaymentStatus,
     pub created_at: u64,
+}
+
+/// One line of a batch payment.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BatchLine {
+    pub merchant: Address,
+    pub amount: i128,
+    pub order_ref: String,
 }
 
 #[contracttype]
@@ -191,72 +203,56 @@ impl PaymentProcessor {
             return Err(PaymentError::Paused);
         }
         payer.require_auth();
+        let settlement = Self::settlement_for(&env, &config, &merchant, &asset)?;
+        Self::settle(
+            &env, &config, &payer, merchant, settlement, &asset, amount, order_ref,
+        )
+    }
 
-        if amount <= 0 {
-            return Err(PaymentError::InvalidAmount);
+    /// Settles several payments from one payer in a single transaction: a
+    /// customer clearing a tab of open orders, or a business paying a batch
+    /// of invoices, possibly across merchants. All lines settle or none do;
+    /// any invalid line (bad amount, duplicate order, merchant not
+    /// accepting) reverts the whole batch. Returns the payment IDs in order.
+    pub fn pay_batch(
+        env: Env,
+        payer: Address,
+        asset: Address,
+        lines: Vec<BatchLine>,
+    ) -> Result<Vec<u64>, PaymentError> {
+        let config = Self::config(&env)?;
+        if config.paused {
+            return Err(PaymentError::Paused);
         }
-        if order_ref.is_empty() || order_ref.len() > MAX_ORDER_REF_LEN {
-            return Err(PaymentError::InvalidOrderRef);
+        if lines.is_empty() || lines.len() > MAX_BATCH {
+            return Err(PaymentError::InvalidBatch);
         }
-        let order_key = DataKey::Order(merchant.clone(), order_ref.clone());
-        if env.storage().persistent().has(&order_key) {
-            return Err(PaymentError::DuplicateOrder);
-        }
+        payer.require_auth();
 
-        // One cross-contract call: active + accepts the asset + where to pay.
-        let settlement = RegistryClient::new(&env, &config.registry)
-            .checkout_target(&merchant, &asset)
-            .ok_or(PaymentError::MerchantNotAccepting)?;
-
-        let (fee, net) = split_fee(amount, config.fee_bps).ok_or(PaymentError::Overflow)?;
-        let token = token::Client::new(&env, &asset);
-        token.transfer(&payer, &settlement, &net);
-        if fee > 0 {
-            token.transfer(&payer, &config.treasury, &fee);
-        }
-
-        let loyalty_points = match &config.loyalty {
-            Some(loyalty) => LoyaltyClient::new(&env, loyalty).accrue(
-                &env.current_contract_address(),
-                &merchant,
+        // Look each merchant up once, however many lines it has.
+        let mut targets: Map<Address, Address> = Map::new(&env);
+        let mut ids = Vec::new(&env);
+        for line in lines.iter() {
+            let settlement = match targets.get(line.merchant.clone()) {
+                Some(s) => s,
+                None => {
+                    let s = Self::settlement_for(&env, &config, &line.merchant, &asset)?;
+                    targets.set(line.merchant.clone(), s.clone());
+                    s
+                }
+            };
+            ids.push_back(Self::settle(
+                &env,
+                &config,
                 &payer,
-                &amount,
-            ),
-            None => 0,
-        };
-
-        let id = Self::payment_count(env.clone()) + 1;
-        let payment = Payment {
-            id,
-            payer: payer.clone(),
-            merchant: merchant.clone(),
-            settlement,
-            asset: asset.clone(),
-            amount,
-            fee,
-            refunded: 0,
-            order_ref: order_ref.clone(),
-            loyalty_points,
-            status: PaymentStatus::Completed,
-            created_at: env.ledger().timestamp(),
-        };
-        Self::save(&env, &payment);
-        env.storage().persistent().set(&order_key, &id);
-        extend_persistent(&env, &order_key);
-        env.storage().instance().set(&DataKey::PaymentCount, &id);
-        extend_instance(&env);
-
-        PaymentSettled {
-            merchant,
-            payment_id: id,
-            payer,
-            asset,
-            amount,
-            fee,
-            order_ref,
+                line.merchant,
+                settlement,
+                &asset,
+                line.amount,
+                line.order_ref,
+            )?);
         }
-        .publish(&env);
-        Ok(id)
+        Ok(ids)
     }
 
     /// Refunds part or all of a payment from the merchant's settlement
@@ -384,6 +380,94 @@ impl PaymentProcessor {
     // ---------------------------------------------------------------------
     // Internals
     // ---------------------------------------------------------------------
+
+    /// One registry call: the merchant's settlement account if it is active
+    /// and accepts `asset`.
+    fn settlement_for(
+        env: &Env,
+        config: &Config,
+        merchant: &Address,
+        asset: &Address,
+    ) -> Result<Address, PaymentError> {
+        RegistryClient::new(env, &config.registry)
+            .checkout_target(merchant, asset)
+            .ok_or(PaymentError::MerchantNotAccepting)
+    }
+
+    /// Validates, transfers and records one payment. The caller has checked
+    /// the pause flag and the payer's authorization.
+    #[allow(clippy::too_many_arguments)]
+    fn settle(
+        env: &Env,
+        config: &Config,
+        payer: &Address,
+        merchant: Address,
+        settlement: Address,
+        asset: &Address,
+        amount: i128,
+        order_ref: String,
+    ) -> Result<u64, PaymentError> {
+        if amount <= 0 {
+            return Err(PaymentError::InvalidAmount);
+        }
+        if order_ref.is_empty() || order_ref.len() > MAX_ORDER_REF_LEN {
+            return Err(PaymentError::InvalidOrderRef);
+        }
+        let order_key = DataKey::Order(merchant.clone(), order_ref.clone());
+        if env.storage().persistent().has(&order_key) {
+            return Err(PaymentError::DuplicateOrder);
+        }
+
+        let (fee, net) = split_fee(amount, config.fee_bps).ok_or(PaymentError::Overflow)?;
+        let token = token::Client::new(env, asset);
+        token.transfer(payer, &settlement, &net);
+        if fee > 0 {
+            token.transfer(payer, &config.treasury, &fee);
+        }
+
+        let loyalty_points = match &config.loyalty {
+            Some(loyalty) => LoyaltyClient::new(env, loyalty).accrue(
+                &env.current_contract_address(),
+                &merchant,
+                payer,
+                &amount,
+            ),
+            None => 0,
+        };
+
+        let id = Self::payment_count(env.clone()) + 1;
+        let payment = Payment {
+            id,
+            payer: payer.clone(),
+            merchant: merchant.clone(),
+            settlement,
+            asset: asset.clone(),
+            amount,
+            fee,
+            refunded: 0,
+            order_ref: order_ref.clone(),
+            loyalty_points,
+            status: PaymentStatus::Completed,
+            created_at: env.ledger().timestamp(),
+        };
+        Self::save(env, &payment);
+        env.storage().persistent().set(&order_key, &id);
+        extend_persistent(env, &order_key);
+        env.storage().instance().set(&DataKey::PaymentCount, &id);
+        extend_instance(env);
+
+        PaymentSettled {
+            merchant,
+            payment_id: id,
+            payer: payer.clone(),
+            asset: asset.clone(),
+            amount,
+            fee,
+            order_ref,
+        }
+        .publish(env);
+        Ok(id)
+    }
 
     fn config(env: &Env) -> Result<Config, PaymentError> {
         env.storage()

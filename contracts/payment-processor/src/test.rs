@@ -242,3 +242,120 @@ fn input_validation() {
         Err(Ok(PaymentError::InvalidOrderRef))
     );
 }
+
+fn line(merchant: &Address, amount: i128, order_ref: String) -> BatchLine {
+    BatchLine {
+        merchant: merchant.clone(),
+        amount,
+        order_ref,
+    }
+}
+
+/// A second approved merchant accepting the same asset.
+fn second_merchant(s: &Setup) -> (Address, Address) {
+    let merchant = Address::generate(&s.env);
+    let settlement = Address::generate(&s.env);
+    s.registry.register(
+        &merchant,
+        &String::from_str(&s.env, "Second Shop"),
+        &settlement,
+        &vec![&s.env, s.asset.clone()],
+    );
+    s.registry.approve(&merchant);
+    (merchant, settlement)
+}
+
+#[test]
+fn batch_settles_every_line_across_merchants() {
+    let s = setup(100);
+    let (m2, settle2) = second_merchant(&s);
+    let ids = s.pp.pay_batch(
+        &s.payer,
+        &s.asset,
+        &vec![
+            &s.env,
+            line(&s.merchant, 10 * UNIT, order(&s.env, "TAB-1")),
+            line(&m2, 20 * UNIT, order(&s.env, "INV-9")),
+            line(&s.merchant, 30 * UNIT, order(&s.env, "TAB-2")),
+        ],
+    );
+    assert_eq!(ids, vec![&s.env, 1u64, 2, 3]);
+    // 1% fee per line, net to each merchant's settlement account.
+    assert_eq!(s.token.balance(&s.settlement), 396 * UNIT / 10);
+    assert_eq!(s.token.balance(&settle2), 198 * UNIT / 10);
+    assert_eq!(s.token.balance(&s.treasury), 6 * UNIT / 10);
+    assert_eq!(s.token.balance(&s.payer), 940 * UNIT);
+    assert_eq!(
+        s.pp.payment_for_order(&m2, &order(&s.env, "INV-9")).amount,
+        20 * UNIT
+    );
+}
+
+#[test]
+fn batch_is_all_or_nothing() {
+    let s = setup(100);
+    let stranger = Address::generate(&s.env);
+    let res = s.pp.try_pay_batch(
+        &s.payer,
+        &s.asset,
+        &vec![
+            &s.env,
+            line(&s.merchant, 10 * UNIT, order(&s.env, "OK-1")),
+            line(&stranger, 5 * UNIT, order(&s.env, "BAD-1")),
+        ],
+    );
+    assert_eq!(res, Err(Ok(PaymentError::MerchantNotAccepting)));
+    // The valid first line was rolled back too.
+    assert_eq!(s.token.balance(&s.payer), 1_000 * UNIT);
+    assert_eq!(s.pp.payment_count(), 0);
+    assert_eq!(
+        s.pp.try_payment_for_order(&s.merchant, &order(&s.env, "OK-1")),
+        Err(Ok(PaymentError::PaymentNotFound))
+    );
+}
+
+#[test]
+fn batch_rejects_a_repeated_order_inside_itself() {
+    let s = setup(0);
+    let res = s.pp.try_pay_batch(
+        &s.payer,
+        &s.asset,
+        &vec![
+            &s.env,
+            line(&s.merchant, UNIT, order(&s.env, "SAME")),
+            line(&s.merchant, UNIT, order(&s.env, "SAME")),
+        ],
+    );
+    assert_eq!(res, Err(Ok(PaymentError::DuplicateOrder)));
+    assert_eq!(s.token.balance(&s.payer), 1_000 * UNIT);
+}
+
+#[test]
+fn batch_size_limits_and_pause() {
+    let s = setup(0);
+    assert_eq!(
+        s.pp.try_pay_batch(&s.payer, &s.asset, &vec![&s.env]),
+        Err(Ok(PaymentError::InvalidBatch))
+    );
+    let mut big = vec![&s.env];
+    for i in 0..=MAX_BATCH {
+        big.push_back(line(
+            &s.merchant,
+            UNIT,
+            String::from_str(&s.env, &std::format!("B-{i}")),
+        ));
+    }
+    assert_eq!(
+        s.pp.try_pay_batch(&s.payer, &s.asset, &big),
+        Err(Ok(PaymentError::InvalidBatch))
+    );
+    s.pp.pause();
+    assert_eq!(
+        s.pp.try_pay_batch(
+            &s.payer,
+            &s.asset,
+            &vec![&s.env, line(&s.merchant, UNIT, order(&s.env, "P"))]
+        ),
+        Err(Ok(PaymentError::Paused))
+    );
+}

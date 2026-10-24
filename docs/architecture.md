@@ -152,6 +152,24 @@ stateDiagram-v2
 - Evidence is a list of up to 10 SHA-256 hashes of off-chain files per
   escrow. No personal data is stored on-chain.
 
+## payment-stream
+
+A payer locks a deposit that unlocks to the recipient linearly between
+`start` and `end`:
+
+```
+streamed(t) = deposit * (min(t, end) - start) / (end - start)
+available   = streamed(t) - withdrawn
+```
+
+- The recipient calls `withdraw` whenever they like for everything accrued.
+- Either party can `cancel` before `end`. The recipient gets the accrued
+  remainder and the payer gets the unearned rest, in the same transaction.
+- Division rounds toward the payer until `end`, when the whole deposit is
+  available, so nothing is left in the contract.
+- `pause` blocks new streams and withdrawals; `cancel` still works, because it
+  only returns funds to their owners.
+
 ## Error codes
 
 Each contract numbers its errors from 1. Clients should map them by contract.

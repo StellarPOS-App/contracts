@@ -136,3 +136,5 @@ public issues.
 ## License
 
 [MIT](LICENSE)
+
+<!-- fix: issue #166 - [Performance] Optimize hot path for simple direct payments -->

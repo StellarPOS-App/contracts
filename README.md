@@ -136,3 +136,5 @@ public issues.
 ## License
 
 [MIT](LICENSE)
+
+## Regression Test Suite\n\nAll previously fixed bugs must have a corresponding regression test in tests/regression/ referencing the issue number, preventing silent recurrence in future refactors.

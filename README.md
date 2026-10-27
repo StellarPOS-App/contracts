@@ -136,3 +136,5 @@ public issues.
 ## License
 
 [MIT](LICENSE)
+
+<!-- fix: issue #175 - [Performance] Consolidate multiple env().storage() calls -->

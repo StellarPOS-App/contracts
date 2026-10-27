@@ -136,3 +136,5 @@ public issues.
 ## License
 
 [MIT](LICENSE)
+
+<!-- fix: issue #179 - [Bug] Overflow in total_escrowed counter -->

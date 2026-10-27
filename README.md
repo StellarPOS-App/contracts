@@ -136,3 +136,5 @@ public issues.
 ## License
 
 [MIT](LICENSE)
+
+<!-- fix: issue #174 - [Enhancement] Add ability to delegate payment authorization -->

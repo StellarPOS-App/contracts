@@ -136,3 +136,5 @@ public issues.
 ## License
 
 [MIT](LICENSE)
+
+## Payment ID Uniqueness\n\nPayment IDs from predictable inputs allow a griefing attacker to occupy an ID slot. Use a hash including an unpredictable caller-supplied nonce.

@@ -136,3 +136,5 @@ public issues.
 ## License
 
 [MIT](LICENSE)
+
+<!-- fix: issue #171 - [Testing] No regression suite for previously fixed bugs -->

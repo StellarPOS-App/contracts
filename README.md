@@ -136,3 +136,5 @@ public issues.
 ## License
 
 [MIT](LICENSE)
+
+## Expired Ledger Entry Handling\n\nReading a ledger entry past its TTL returns None from get(). The contract must handle this explicitly rather than unwrapping, or extend TTL proactively on every read of long-lived records.

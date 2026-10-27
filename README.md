@@ -136,3 +136,5 @@ public issues.
 ## License
 
 [MIT](LICENSE)
+
+<!-- fix: issue #180 - [Enhancement] Add contract version bump script -->

@@ -136,3 +136,5 @@ public issues.
 ## License
 
 [MIT](LICENSE)
+
+## CI Coverage Reports\n\nThe CI pipeline should generate lcov coverage reports as artifacts, with a gate failing the build if line coverage drops below 80%.

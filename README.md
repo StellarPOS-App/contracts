@@ -136,3 +136,5 @@ public issues.
 ## License
 
 [MIT](LICENSE)
+
+<!-- fix: issue #178 - [Security] Missing auth on set_fee_recipient -->

@@ -136,3 +136,5 @@ public issues.
 ## License
 
 [MIT](LICENSE)
+
+<!-- fix: issue #169 - [Bug] Negative fee produces underflow when deducted -->

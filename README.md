@@ -136,3 +136,5 @@ public issues.
 ## License
 
 [MIT](LICENSE)
+
+## Group Payment Splitting\n\nA pay_split entry point allowing multiple payers to contribute to a single order atomically, reverting fully if any sub-transfer fails.

@@ -136,3 +136,5 @@ public issues.
 ## License
 
 [MIT](LICENSE)
+
+<!-- fix: issue #164 - [Bug] Admin revocation does not clear pending admin actions -->

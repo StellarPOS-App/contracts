@@ -136,3 +136,5 @@ public issues.
 ## License
 
 [MIT](LICENSE)
+
+<!-- fix: issue #181 - fix: [Security] No on-chain governance for parameter changes -->

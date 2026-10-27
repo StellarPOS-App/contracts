@@ -136,3 +136,5 @@ public issues.
 ## License
 
 [MIT](LICENSE)
+
+## Compliance Report Hook\n\nAn optional on-chain hook address per merchant enables the processor to emit compliance events after each settlement without modifying core contract logic.

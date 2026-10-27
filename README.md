@@ -136,3 +136,5 @@ public issues.
 ## License
 
 [MIT](LICENSE)
+
+## Merchant Payment Count on Refund\n\nThe payment_count metric must be decremented or a refund_count incremented when a refund is processed to avoid inflating reported transaction volume.

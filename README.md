@@ -136,3 +136,5 @@ public issues.
 ## License
 
 [MIT](LICENSE)
+
+## Admin Revocation Cleanup\n\nRevoking an admin must cancel all pending multisig proposals requiring that admin's signature to prevent orphaned votes.

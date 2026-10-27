@@ -136,3 +136,5 @@ public issues.
 ## License
 
 [MIT](LICENSE)
+
+## Malicious Token Testing\n\nThe test suite must include a mock token returning false from transfer or reverting mid-transfer to test behaviour against non-standard SAC implementations.

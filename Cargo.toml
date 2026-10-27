@@ -18,7 +18,7 @@ repository = "https://github.com/StellarPOS-App/contracts"
 rust-version = "1.84"
 
 [workspace.dependencies]
-soroban-sdk = "27.0.6"
+soroban-sdk = "29.0.1"
 shared = { path = "contracts/shared" }
 merchant-registry = { path = "contracts/merchant-registry" }
 loyalty-program = { path = "contracts/loyalty-program" }

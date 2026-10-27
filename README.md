@@ -136,3 +136,5 @@ public issues.
 ## License
 
 [MIT](LICENSE)
+
+<!-- fix: issue #172 - [Security] No slippage protection on cross-currency conversions -->

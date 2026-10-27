@@ -136,3 +136,5 @@ public issues.
 ## License
 
 [MIT](LICENSE)
+
+## Reentrancy via Callback\n\nAny function invoking an external contract must complete all internal state writes before the cross-contract call. Soroban does not prevent reentrancy at the contract level.

@@ -136,3 +136,5 @@ public issues.
 ## License
 
 [MIT](LICENSE)
+
+## Negative Fee Guard\n\nFee values must be validated as non-negative before arithmetic. A negative fee passed through bps_of wraps on underflow, producing a vastly inflated net payment to the merchant.

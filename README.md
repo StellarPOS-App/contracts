@@ -136,3 +136,5 @@ public issues.
 ## License
 
 [MIT](LICENSE)
+
+## POS Terms Glossary\n\nA glossary in docs/glossary.md (settlement, escrow, loyalty tier, BPS, SAC, order_ref) helps new contributors understand contract semantics without prior Stellar knowledge.

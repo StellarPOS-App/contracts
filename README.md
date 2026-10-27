@@ -136,3 +136,5 @@ public issues.
 ## License
 
 [MIT](LICENSE)
+
+<!-- fix: issue #170 - [Enhancement] Add on-chain POS terminal registration -->

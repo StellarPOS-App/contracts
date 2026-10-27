@@ -136,3 +136,5 @@ public issues.
 ## License
 
 [MIT](LICENSE)
+
+## Direct Payment Hot Path\n\nA dedicated pay_direct entry point for same-asset payments with no loyalty or escrow can skip registry lookups and fee splits, reducing ledger operations.

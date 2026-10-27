@@ -136,3 +136,5 @@ public issues.
 ## License
 
 [MIT](LICENSE)
+
+## Slippage Protection\n\nCross-currency conversions must accept a min_amount_out parameter. Without it, a price oracle update between quote and settlement can result in fewer tokens than expected.

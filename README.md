@@ -136,3 +136,5 @@ public issues.
 ## License
 
 [MIT](LICENSE)
+
+## On-Chain Terminal Registration\n\nPOS terminals should be registered on-chain so the backend can verify a payment was initiated from an authorized device, preventing fraudulent payment injection.

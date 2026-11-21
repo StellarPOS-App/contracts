@@ -34,6 +34,7 @@ use soroban_sdk::{
 };
 
 pub const MAX_EVIDENCE: u32 = 10;
+pub const MIN_ESCROW_LOCK_PERIOD: u64 = 60 * 60;
 pub const MIN_ARBITRATION_WINDOW: u64 = 60 * 60;
 pub const MAX_ARBITRATION_WINDOW: u64 = 30 * 24 * 60 * 60;
 
@@ -149,6 +150,8 @@ enum DataKey {
     Escrow(u64),
     Dispute(u64),
     Evidence(u64),
+    MinLockPeriod,
+    LockUntil(u64),
 }
 
 #[contractevent]
@@ -198,6 +201,12 @@ pub struct DisputeResolved {
     pub id: u64,
     pub buyer_bps: u32,
     pub by_default: bool,
+}
+
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EscrowLockPeriodChanged {
+    pub seconds: u64,
 }
 
 #[contractevent]
@@ -287,7 +296,12 @@ impl EscrowService {
             return Err(EscrowError::InvalidParties);
         }
         let now = env.ledger().timestamp();
-        if release_at <= now
+        // Store the promised lock at funding so future policy changes only
+        // affect new escrows.
+        let lock_until = now
+            .checked_add(Self::min_lock_period(env.clone()))
+            .ok_or(EscrowError::Overflow)?;
+        if release_at < lock_until
             || !(MIN_ARBITRATION_WINDOW..=MAX_ARBITRATION_WINDOW).contains(&arbitration_window)
         {
             return Err(EscrowError::InvalidSchedule);
@@ -311,6 +325,9 @@ impl EscrowService {
             created_at: now,
         };
         Self::save(&env, &escrow);
+        let lock_key = DataKey::LockUntil(id);
+        env.storage().persistent().set(&lock_key, &lock_until);
+        extend_persistent(&env, &lock_key);
         env.storage().instance().set(&DataKey::Count, &id);
         extend_instance(&env);
 
@@ -330,6 +347,8 @@ impl EscrowService {
         Self::require_not_paused(&env)?;
         let mut escrow = Self::funded(&env, id)?;
         escrow.buyer.require_auth();
+        // Buyer approval still leaves the minimum dispute window intact.
+        Self::require_release_unlocked(&env, &escrow)?;
         let amount = escrow.remaining();
         Self::payout(&env, &mut escrow, amount, 0, EscrowStatus::Released);
         Ok(())
@@ -340,9 +359,11 @@ impl EscrowService {
         Self::require_not_paused(&env)?;
         let mut escrow = Self::funded(&env, id)?;
         escrow.buyer.require_auth();
+        Self::require_release_unlocked(&env, &escrow)?;
         if amount <= 0 || amount > escrow.remaining() {
             return Err(EscrowError::InvalidAmount);
         }
+        // A partial payout keeps the remaining balance open for disputes.
         let status = if amount == escrow.remaining() {
             EscrowStatus::Released
         } else {
@@ -358,6 +379,7 @@ impl EscrowService {
         Self::require_not_paused(&env)?;
         let mut escrow = Self::funded(&env, id)?;
         escrow.seller.require_auth();
+        Self::require_release_unlocked(&env, &escrow)?;
         if env.ledger().timestamp() < escrow.release_at {
             return Err(EscrowError::ReleaseNotDue);
         }
@@ -406,7 +428,12 @@ impl EscrowService {
             return Err(EscrowError::DisputeWindowClosed);
         }
 
-        let deadline = now + escrow.arbitration_window;
+        // Allow the arbiter to rule at the unlock time even when the
+        // arbitration window would otherwise end sooner.
+        let deadline = now
+            .checked_add(escrow.arbitration_window)
+            .ok_or(EscrowError::Overflow)?
+            .max(Self::lock_until(&env, &escrow));
         escrow.status = EscrowStatus::Disputed;
         Self::save(&env, &escrow);
         Self::save_dispute(
@@ -456,6 +483,7 @@ impl EscrowService {
         let escrow = Self::disputed(&env, id)?;
         escrow.arbiter.require_auth();
         let dispute = Self::load_dispute(&env, id)?;
+        // The arbiter has the deadline second; the default starts after it.
         if env.ledger().timestamp() > dispute.deadline {
             return Err(EscrowError::DeadlinePassed);
         }
@@ -489,6 +517,26 @@ impl EscrowService {
         Self::admin(&env)?.require_auth();
         env.storage().instance().set(&DataKey::Paused, &false);
         Ok(())
+    }
+
+    /// Changes the minimum lock for future escrows. The admin must sign.
+    pub fn set_min_lock_period(env: Env, seconds: u64) -> Result<(), EscrowError> {
+        Self::admin(&env)?.require_auth();
+        if seconds < MIN_ESCROW_LOCK_PERIOD {
+            return Err(EscrowError::InvalidSchedule);
+        }
+        env.storage().instance().set(&DataKey::MinLockPeriod, &seconds);
+        extend_instance(&env);
+        EscrowLockPeriodChanged { seconds }.publish(&env);
+        Ok(())
+    }
+
+    /// Returns the minimum funding-to-release delay for new escrows.
+    pub fn min_lock_period(env: Env) -> u64 {
+        env.storage()
+            .instance()
+            .get(&DataKey::MinLockPeriod)
+            .unwrap_or(MIN_ESCROW_LOCK_PERIOD)
     }
 
     pub fn get_escrow(env: Env, id: u64) -> Result<Escrow, EscrowError> {
@@ -533,6 +581,21 @@ impl EscrowService {
         Ok(())
     }
 
+    fn lock_until(env: &Env, escrow: &Escrow) -> u64 {
+        // Older records have no snapshot and use the protocol minimum.
+        env.storage()
+            .persistent()
+            .get(&DataKey::LockUntil(escrow.id))
+            .unwrap_or_else(|| escrow.created_at.saturating_add(MIN_ESCROW_LOCK_PERIOD))
+    }
+
+    fn require_release_unlocked(env: &Env, escrow: &Escrow) -> Result<(), EscrowError> {
+        if env.ledger().timestamp() < Self::lock_until(env, escrow) {
+            return Err(EscrowError::ReleaseNotDue);
+        }
+        Ok(())
+    }
+
     fn settle_dispute(
         env: &Env,
         mut escrow: Escrow,
@@ -540,9 +603,16 @@ impl EscrowService {
         buyer_bps: u32,
         by_default: bool,
     ) -> Result<(), EscrowError> {
+        // Split the held remainder rather than funds already paid out on
+        // completed milestones. Assign any rounding remainder to the seller.
         let remaining = escrow.remaining();
         let to_buyer = bps_of(remaining, buyer_bps).ok_or(EscrowError::InvalidSplit)?;
         let to_seller = remaining - to_buyer;
+        if to_seller > 0 {
+            Self::require_release_unlocked(env, &escrow)?;
+        }
+
+        // Persist the ruling and payout together in the same invocation.
         dispute.buyer_bps = buyer_bps;
         dispute.by_default = by_default;
         Self::save_dispute(env, escrow.id, &dispute);
@@ -570,6 +640,8 @@ impl EscrowService {
         to_buyer: i128,
         status: EscrowStatus,
     ) {
+        // Use the asset captured at funding for every payout, even if
+        // another escrow is opened with a different asset.
         let token = token::Client::new(env, &escrow.asset);
         let this = env.current_contract_address();
         if to_seller > 0 {
@@ -582,6 +654,9 @@ impl EscrowService {
         escrow.refunded += to_buyer;
         escrow.status = status;
         Self::save(env, escrow);
+        if status != EscrowStatus::Funded {
+            env.storage().persistent().remove(&DataKey::LockUntil(escrow.id));
+        }
         FundsReleased {
             id: escrow.id,
             to_seller,
@@ -659,6 +734,10 @@ impl EscrowService {
             .get(&key)
             .ok_or(EscrowError::EscrowNotFound)?;
         extend_persistent(env, &key);
+        let lock_key = DataKey::LockUntil(id);
+        if env.storage().persistent().has(&lock_key) {
+            extend_persistent(env, &lock_key);
+        }
         Ok(escrow)
     }
 

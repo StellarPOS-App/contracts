@@ -1071,3 +1071,16 @@ fn state_snapshot_batch_and_per_merchant_refund_counts() {
         Err(Ok(PaymentError::Reentrancy))
     );
 }
+
+#[test]
+fn registered_merchant_payment_count_reads_zero_without_allocating_storage() {
+    let s = setup(250);
+    let key = DataKey::MerchantPaymentCount(s.merchant.clone());
+    assert!(!s.env.as_contract(&s.pp.address, || {
+        s.env.storage().persistent().has(&key)
+    }));
+    assert_eq!(s.pp.merchant_payment_count(&s.merchant), 0);
+    assert!(!s.env.as_contract(&s.pp.address, || {
+        s.env.storage().persistent().has(&key)
+    }));
+}

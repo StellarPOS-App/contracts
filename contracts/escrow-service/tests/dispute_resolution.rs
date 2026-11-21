@@ -2,7 +2,7 @@
 
 use escrow_service::{
     dispute::DisputeReason, EscrowError, EscrowService, EscrowServiceClient, EscrowStatus,
-    MAX_EVIDENCE,
+    MAX_EVIDENCE, MIN_ESCROW_LOCK_PERIOD,
 };
 use soroban_sdk::{
     testutils::{Address as _, Ledger},
@@ -97,6 +97,11 @@ fn arbiter_splits_funds() {
     );
     w.escrow.submit_evidence(&w.seller, &w.id, &hash(&w.env, 2));
 
+    assert_eq!(
+        w.escrow.try_resolve(&w.id, &3_000),
+        Err(Ok(EscrowError::ReleaseNotDue))
+    );
+    advance(&w, MIN_ESCROW_LOCK_PERIOD);
     // 30% back to the buyer, 70% to the seller.
     w.escrow.resolve(&w.id, &3_000);
     assert_eq!(w.token.balance(&w.buyer), 300);
@@ -104,7 +109,7 @@ fn arbiter_splits_funds() {
 
     assert_eq!(w.escrow.get_escrow(&w.id).status, EscrowStatus::Resolved);
     let d = w.escrow.get_dispute(&w.id);
-    assert_eq!(d.buyer_bps, Some(3_000));
+    assert_eq!(d.buyer_bps, 3_000);
     assert!(!d.by_default);
 }
 
@@ -164,6 +169,7 @@ fn seller_wins_by_default_against_unresponsive_buyer() {
 #[test]
 fn dispute_after_partial_release_only_splits_the_remainder() {
     let w = world();
+    advance(&w, MIN_ESCROW_LOCK_PERIOD);
     w.escrow.release_partial(&w.id, &400);
     w.escrow
         .raise_dispute(&w.buyer, &w.id, &DisputeReason::NotAsDescribed, &None);

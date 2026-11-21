@@ -99,6 +99,14 @@ Point-of-sale terms used across the contracts and docs:
 | **Governance council** | Once enabled, the members who must approve fee-rate and treasury changes instead of the admin alone. |
 | **TTL / bump** | Soroban storage expires unless extended; contracts bump records whenever they are read or written. |
 
+Escrow seller payouts have a one-hour minimum lock by default. The admin can
+set a longer minimum with `set_min_lock_period(seconds)`. New escrows record the
+policy at funding and require `release_at` at or after the lock ends. Buyer-only
+refunds can return funds before unlock. Each escrow pays out in the asset it
+recorded at funding. Merchant registration leaves payment statistics absent
+until the first successful payment. The payment count reads as zero in the meantime.
+
+
 ## Getting started
 
 ### Prerequisites

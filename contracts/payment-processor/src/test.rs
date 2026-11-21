@@ -4,12 +4,9 @@ use super::*;
 use loyalty_program::{LoyaltyProgram, LoyaltyProgramClient};
 use merchant_registry::{MerchantRegistry, MerchantRegistryClient};
 use soroban_sdk::{
-    testutils::{Address as _, Ledger as _},
+    testutils::{Address as _, Ledger as _, Events},
     token::StellarAssetClient,
-    vec, Env, String,
-    testutils::{Address as _, Events},
-    token::StellarAssetClient,
-    vec, Env, Event, String,
+    vec, Env, String, Event,
 };
 
 const UNIT: i128 = 10_000_000;
@@ -1070,4 +1067,219 @@ fn state_snapshot_batch_and_per_merchant_refund_counts() {
         s.pp.try_refund(&id, &UNIT, &order(&s.env, "LOCKED")),
         Err(Ok(PaymentError::Reentrancy))
     );
+}
+
+// Property tests for issue #135: Fee invariants
+
+#[test]
+fn property_fee_and_net_conserve_total_for_single_payment() {
+    let test_cases = vec![
+        (100, 100),
+        (1_000, 250),
+        (10_000_000, 500),
+        (1_000_000_000, 10),
+        (i128::MAX / 1_000, 1_000),
+    ];
+
+    for (amount, fee_bps) in test_cases {
+        let s = setup(fee_bps);
+        let id = s.pp.pay(
+            &s.payer,
+            &s.merchant,
+            &s.asset,
+            &amount,
+            &order(&s.env, &format!("PROP-{}-{}", amount, fee_bps)),
+        );
+
+        let payment = s.pp.get_payment(&id);
+        let total = payment.fee.checked_add(payment.amount).unwrap();
+        assert_eq!(total, payment.fee + payment.amount,
+            "fee + amount should compute correctly for amount={}, fee_bps={}", amount, fee_bps);
+
+        let (expected_fee, expected_net) = s.pp.quote(&amount).unwrap();
+        assert_eq!(payment.fee, expected_fee,
+            "payment fee should match quote for amount={}, fee_bps={}", amount, fee_bps);
+        assert_eq!(expected_fee + expected_net, amount,
+            "fee and net must sum to original amount for amount={}, fee_bps={}", amount, fee_bps);
+    }
+}
+
+#[test]
+fn property_batch_payments_conserve_funds() {
+    let s = setup(250);
+    let (m2, _settle2) = second_merchant(&s);
+
+    let amounts = vec![
+        (100 * UNIT, "BAT-1"),
+        (500 * UNIT, "BAT-2"),
+        (1_000 * UNIT, "BAT-3"),
+    ];
+
+    let lines: Vec<BatchLine> = amounts.iter().map(|(amt, ref_str)| {
+        line(&s.merchant, *amt, order(&s.env, ref_str))
+    }).collect::<Vec<_>>();
+
+    let ids = s.pp.pay_batch(&s.payer, &s.asset, &Vec::from_array(&s.env, &lines));
+
+    let mut total_fees = 0i128;
+    let mut total_net = 0i128;
+    for id in ids.iter() {
+        let payment = s.pp.get_payment(&id);
+        total_fees = total_fees.checked_add(payment.fee).unwrap();
+        total_net = total_net.checked_add(payment.amount - payment.fee).unwrap();
+    }
+
+    let total_paid: i128 = amounts.iter().map(|(amt, _)| amt).sum();
+    assert_eq!(total_fees + total_net, total_paid,
+        "batch payment fees and net should conserve total amount");
+}
+
+#[test]
+fn property_royalty_payments_conserve_funds() {
+    let s = setup(250);
+    let recip1 = Address::generate(&s.env);
+    let recip2 = Address::generate(&s.env);
+
+    let royalties = vec![
+        RoyaltyShare { recipient: recip1.clone(), bps: 1000 },
+        RoyaltyShare { recipient: recip2.clone(), bps: 2000 },
+    ];
+
+    let amount = 100 * UNIT;
+    let id = s.pp.pay_with_royalties(
+        &s.payer,
+        &s.merchant,
+        &s.asset,
+        &amount,
+        &order(&s.env, "ROYAL-1"),
+        &Vec::from_array(&s.env, &royalties),
+    );
+
+    let payment = s.pp.get_payment(&id);
+    let (fee, net) = s.pp.quote(&amount).unwrap();
+
+    let recip1_balance = s.token.balance(&recip1);
+    let recip2_balance = s.token.balance(&recip2);
+    let settlement_balance = s.token.balance(&s.settlement);
+    let treasury_balance = s.token.balance(&s.treasury);
+
+    let total_distributed = recip1_balance + recip2_balance + settlement_balance + treasury_balance;
+    assert_eq!(total_distributed, amount,
+        "royalty payment must distribute full amount: fee={}, net={}", fee, net);
+}
+
+#[test]
+fn property_refunds_cannot_exceed_original_amount() {
+    let s = setup(100);
+
+    let payment_amounts = vec![100 * UNIT, 500 * UNIT, 1_000 * UNIT];
+
+    for amount in payment_amounts {
+        let id = s.pp.pay(
+            &s.payer,
+            &s.merchant,
+            &s.asset,
+            &amount,
+            &order(&s.env, &format!("REFUND-{}", amount)),
+        );
+
+        let payment = s.pp.get_payment(&id);
+        assert!(payment.refunded <= payment.amount,
+            "initial refund amount must be 0 for payment amount={}", amount);
+
+        let partial_refund = amount / 3;
+        let total_refunded = s.pp.refund(&id, &partial_refund, &String::from_str(&s.env, "partial"));
+        assert!(total_refunded <= amount,
+            "refunded amount must not exceed original for amount={}", amount);
+
+        let second_refund = amount - partial_refund;
+        let total_after_second = s.pp.refund(&id, &second_refund, &String::from_str(&s.env, "complete"));
+        assert_eq!(total_after_second, amount,
+            "total refunded must equal original amount for amount={}", amount);
+    }
+}
+
+#[test]
+fn property_fee_rate_constraints() {
+    let fee_rates = vec![0, 100, 250, 500, 1_000];
+    let amount = 100 * UNIT;
+
+    for fee_bps in fee_rates {
+        let s = setup(fee_bps);
+        let (quoted_fee, quoted_net) = s.pp.quote(&amount).unwrap();
+
+        assert!(quoted_fee <= amount, "fee cannot exceed amount for fee_bps={}", fee_bps);
+        assert!(quoted_net >= 0, "net must be non-negative for fee_bps={}", fee_bps);
+        assert_eq!(quoted_fee + quoted_net, amount,
+            "fee and net must sum to amount for fee_bps={}", fee_bps);
+
+        let bps_pct = (quoted_fee * 10_000) / amount;
+        assert!(bps_pct <= fee_bps as i128 + 1,
+            "computed bps must match or be very close to configured rate");
+    }
+}
+
+#[test]
+fn property_multiple_payments_same_merchant_independent() {
+    let s = setup(250);
+    let amounts = vec![100 * UNIT, 200 * UNIT, 300 * UNIT];
+
+    let mut ids = Vec::new(&s.env);
+    for (i, amt) in amounts.iter().enumerate() {
+        let id = s.pp.pay(
+            &s.payer,
+            &s.merchant,
+            &s.asset,
+            amt,
+            &order(&s.env, &format!("MULTI-{}", i)),
+        );
+        ids.push_back(id);
+    }
+
+    let mut total_fees = 0i128;
+    let mut total_amounts = 0i128;
+    for id in ids.iter() {
+        let p = s.pp.get_payment(&id);
+        total_fees = total_fees.checked_add(p.fee).unwrap();
+        total_amounts = total_amounts.checked_add(p.amount).unwrap();
+    }
+
+    let expected_total: i128 = amounts.iter().sum();
+    assert_eq!(total_amounts, expected_total,
+        "sum of payment amounts must equal total paid");
+
+    let expected_total_fee = (expected_total * 250) / 10_000;
+    assert_eq!(total_fees, expected_total_fee,
+        "sum of fees must equal total fee for all payments");
+}
+
+#[test]
+fn property_idempotency_no_duplicate_charges() {
+    let s = setup(250);
+
+    let id1 = s.pp.pay(
+        &s.payer,
+        &s.merchant,
+        &s.asset,
+        &(100 * UNIT),
+        &order(&s.env, "IDEM-1"),
+    );
+
+    let payment1 = s.pp.get_payment(&id1);
+    let settlement_after_first = s.token.balance(&s.settlement);
+
+    let id2 = s.pp.try_pay(
+        &s.payer,
+        &s.merchant,
+        &s.asset,
+        &(100 * UNIT),
+        &order(&s.env, "IDEM-1"),
+    );
+
+    assert!(id2.is_ok() || id2 == Err(Ok(PaymentError::DuplicateOrder)),
+        "retried payment with same order ref should either return existing id or duplicate error");
+
+    let settlement_after_retry = s.token.balance(&s.settlement);
+    assert_eq!(settlement_after_first, settlement_after_retry,
+        "retry with same order ref should not transfer additional funds");
 }

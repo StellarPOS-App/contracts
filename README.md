@@ -16,6 +16,107 @@ This repository is one of three:
 | [`backend`](https://github.com/StellarPOS-App/backend) | REST + WebSocket API: catalog, sales, checkout, payment matching |
 | [`surface`](https://github.com/StellarPOS-App/surface) | The point-of-sale web app cashiers and managers use |
 
+## Architecture Overview
+
+The StellarPOS system is composed of six smart contracts that work together to provide a complete point-of-sale solution on Stellar:
+
+```mermaid
+graph TB
+    subgraph External Actors
+        CUSTOMER[👤 Customer Wallet]
+        MERCHANT[🏪 Merchant]
+        ADMIN[🔧 Admin/Council]
+        ARBITER[⚖️ Arbiter]
+    end
+
+    subgraph Core Settlement
+        PP[💳 Payment Processor<br/>settlement & refunds]
+        REG[📋 Merchant Registry<br/>approval & assets]
+        TREAS[🏦 Treasury<br/>M-of-N multisig]
+    end
+
+    subgraph Value-Add Services
+        LOY[🎁 Loyalty Program<br/>points & tiers]
+        ESC[🤝 Escrow Service<br/>held payments & disputes]
+        STREAM[⏱️ Payment Stream<br/>per-second flows]
+    end
+
+    subgraph Infrastructure
+        TOKEN[🪙 Stellar Asset<br/>SAC token]
+        VAULT[📦 Yield Vault<br/>optional DeFi]
+    end
+
+    %% Customer interactions
+    CUSTOMER -->|pay/pay_batch| PP
+    CUSTOMER -->|create/release| ESC
+    CUSTOMER -->|create stream| STREAM
+    CUSTOMER -->|redeem points| LOY
+
+    %% Merchant interactions
+    MERCHANT -->|register| REG
+    MERCHANT -->|refund| PP
+    MERCHANT -->|claim escrow| ESC
+    MERCHANT -->|enroll customers| LOY
+    MERCHANT -->|co-sign redemption| LOY
+
+    %% Admin interactions
+    ADMIN -->|approve/suspend| REG
+    ADMIN -->|configure| PP
+    ADMIN -->|propose/approve| TREAS
+    ADMIN -->|pause contracts| PP
+    ADMIN -->|pause contracts| REG
+    ADMIN -->|pause contracts| LOY
+    ADMIN -->|pause contracts| ESC
+
+    %% Arbiter interactions
+    ARBITER -->|resolve dispute| ESC
+
+    %% Core contract interactions
+    PP -->|accepts?<br/>settlement_of?| REG
+    PP -->|accrue points| LOY
+    PP -->|fee transfer| TREAS
+    PP -->|transfer net| TOKEN
+    PP -->|transfer fee| TOKEN
+
+    %% Escrow flows
+    ESC -->|lock/release funds| TOKEN
+    ESC -.->|independent| PP
+
+    %% Stream flows
+    STREAM -->|withdraw/cancel| TOKEN
+
+    %% Treasury operations
+    TREAS -->|withdraw| TOKEN
+    TREAS -->|deposit/withdraw| VAULT
+    VAULT -->|yield| TOKEN
+
+    %% Styling
+    classDef customer fill:#e1f5ff,stroke:#0288d1,stroke-width:2px
+    classDef merchant fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    classDef admin fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef core fill:#c8e6c9,stroke:#388e3c,stroke-width:3px
+    classDef service fill:#ffe0b2,stroke:#e64a19,stroke-width:2px
+    classDef infra fill:#f5f5f5,stroke:#616161,stroke-width:2px
+    
+    class CUSTOMER customer
+    class MERCHANT merchant
+    class ADMIN,ARBITER admin
+    class PP,REG,TREAS core
+    class LOY,ESC,STREAM service
+    class TOKEN,VAULT infra
+```
+
+### Key Relationships
+
+- **Payment Processor** is the orchestrator: it validates merchants through the registry, transfers funds via tokens, sends fees to treasury, and accrues loyalty points
+- **Merchant Registry** is the source of truth for who can receive payments and which assets they accept
+- **Treasury** is a fully independent M-of-N multisig that receives protocol fees and can deploy idle funds to yield vaults
+- **Loyalty Program** maintains per-merchant customer accounts with automatic tier upgrades (Bronze → Silver → Gold → Platinum)
+- **Escrow Service** operates independently for held payments with dispute resolution
+- **Payment Stream** enables per-second continuous payments for subscriptions and payroll
+
+All settlement happens atomically in a single transaction—either the entire payment succeeds (fees to treasury, net to merchant, points accrued) or nothing moves.
+
 ## The contracts
 
 | Crate | Purpose | Key entry points |

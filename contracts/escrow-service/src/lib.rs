@@ -402,11 +402,7 @@ impl EscrowService {
             release_at,
             arbitration_window,
         )?;
-        token::Client::new(&env, &asset).transfer(
-            &buyer,
-            &env.current_contract_address(),
-            &premium,
-        );
+        token::Client::new(&env, &asset).transfer(&buyer, env.current_contract_address(), &premium);
         env.storage().persistent().set(&DataKey::Insured(id), &true);
         let pool_key = DataKey::InsurancePool(asset);
         let pool: i128 = env.storage().persistent().get(&pool_key).unwrap_or(0);

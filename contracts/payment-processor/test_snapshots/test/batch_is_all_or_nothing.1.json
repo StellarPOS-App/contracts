@@ -498,12 +498,6 @@
                           },
                           {
                             "key": {
-                              "symbol": "loyalty"
-                            },
-                            "val": "void"
-                          },
-                          {
-                            "key": {
                               "symbol": "paused"
                             },
                             "val": {
@@ -527,6 +521,18 @@
                             }
                           }
                         ]
+                      }
+                    },
+                    {
+                      "key": {
+                        "vec": [
+                          {
+                            "symbol": "NextPaymentId"
+                          }
+                        ]
+                      },
+                      "val": {
+                        "u64": "0"
                       }
                     },
                     {

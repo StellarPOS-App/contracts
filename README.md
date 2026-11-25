@@ -156,7 +156,8 @@ contracts/
   escrow-service/
     src/dispute.rs      dispute reasons, role rules, default rulings
     tests/              end-to-end dispute scenarios
-docs/                   architecture and deployment guides
+docs/                   architecture, deployment and authorization audit
+examples/js/            JavaScript integration examples (checkout, verify, refund)
 scripts/deploy.sh       deploy + initialize + wire
 deployments/            contract IDs per network (written by deploy.sh)
 ```

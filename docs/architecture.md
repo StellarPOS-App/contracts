@@ -64,13 +64,16 @@ check cheap.
 | Key | Storage | Value |
 |---|---|---|
 | `Config` | instance | `admin, registry, treasury, fee_bps, loyalty, paused` |
-| `PaymentCount` | instance | last payment id |
+| `PaymentCount` | instance | number of payments settled |
 | `Payment(id)` | persistent | full payment record |
 | `Order(merchant, order_ref)` | persistent | payment id (the idempotency index) |
 
-**Fees.** `fee = amount * fee_bps / 10_000`, rounded toward zero, capped at
+**Fees.** `fee = amount * fee_bps / 10_000`, rounded half up (a fractional
+part of 0.5 or more rounds away from zero) and floored at 0, capped at
 `MAX_FEE_BPS = 1000` (10%). `quote(amount)` returns `(fee, net)` for checkout
-previews.
+previews. Half-up rounding means truncation can never quietly underpay the
+treasury, and the floor means a computed fee can never be negative and so can
+never be deducted as a payout bonus.
 
 **Refunds** are authorized by the payment's settlement account, because that
 account holds the funds. A refund can be partial and repeated, up to the gross
@@ -79,6 +82,20 @@ absorbs it. That is standard card-network behavior, and it stops refunds
 being used to drain the treasury.
 
 **Status:** `Completed`, then `PartiallyRefunded`, then `Refunded`.
+
+**Payment IDs** are the first 8 bytes of a SHA-256 over the merchant, order
+reference, payer, payment count and ledger sequence, so the next ID cannot be
+predicted from a counter.
+
+**Transfers are verified.** After each transfer the recipient's balance must
+have risen by exactly the amount sent, otherwise the call reverts with
+`TransferFailed`. A token that reports success without moving funds, or that
+skims a fee, cannot settle a payment or a refund.
+
+**Compliance records.** Every sale and refund emits a `ComplianceRecord`
+under the `compliance` topic (plus `kind` and `merchant` topics) carrying the
+payment id, payer, settlement account, asset, amount, fee, order reference and
+ledger timestamp, so a reporting tool needs one subscription for all of them.
 
 ## loyalty-program
 
@@ -110,17 +127,22 @@ Every change is a proposal:
 
 | Action | Effect on execute |
 |---|---|
-| `Withdraw(token, to, amount)` | Pays out. Blocked while frozen. |
+| `Withdraw(token, to, amount)` | Pays out after a one-day timelock. Blocked while frozen. |
 | `AddSigner(addr)` | Max 10 signers, no duplicates |
-| `RemoveSigner(addr)` | Rejected if signers would drop below threshold |
+| `RemoveSigner(addr)` | Rejected if signers would drop below threshold. Cancels every open proposal the removed signer made. |
 | `SetThreshold(n)` | `1 <= n <= signers` |
 | `Unfreeze` | Clears an emergency freeze |
 | `ApproveVault(vault)` / `RevokeVault(vault)` | Allows (up to 5) or stops deposits into a yield vault |
-| `VaultDeposit(vault, token, amount)` | Moves idle funds into an approved vault. Blocked while frozen. |
+| `VaultDeposit(vault, token, amount)` | Moves idle funds into an approved vault after a one-day timelock. Blocked while frozen. |
 | `VaultWithdraw(vault, shares)` | Redeems back into the treasury. Allowed while frozen and after revocation. |
 
 - Execution counts approvals only from **current** signers, so a removed
   signer's earlier approvals stop counting.
+- `Withdraw` and `VaultDeposit` are timelocked: they cannot execute until
+  `FUND_MOVEMENT_TIMELOCK_SECS` (one day) after creation. `executable_at(id)`
+  reports the earliest execution timestamp. The delay gives signers time to
+  freeze the treasury if a key is compromised; `VaultWithdraw` and the
+  governance actions execute immediately once approved.
 - Proposals expire 7 days after creation.
 - **Yield vaults** implement `deposit(from, amount) -> shares`,
   `withdraw(owner, shares) -> amount` and `shares(owner)`. A deposit grants

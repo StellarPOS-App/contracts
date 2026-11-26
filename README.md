@@ -333,6 +333,9 @@ public issues.
 
 [MIT](LICENSE)
 
+ fix/issue-172-add-slippage-protection
+## Slippage Protection\n\nCross-currency conversions must accept a min_amount_out parameter. Without it, a price oracle update between quote and settlement can result in fewer tokens than expected.
+
  fix/issue-170-add-on-chain-terminal-registration
 ## On-Chain Terminal Registration\n\nPOS terminals should be registered on-chain so the backend can verify a payment was initiated from an authorized device, preventing fraudulent payment injection.
 
@@ -367,6 +370,7 @@ public issues.
 ## POS Terms Glossary\n\nA glossary in docs/glossary.md (settlement, escrow, loyalty tier, BPS, SAC, order_ref) helps new contributors understand contract semantics without prior Stellar knowledge.
 
 ## Configurable Royalty Split\n\nMarketplace integrations need a royalty split where a configurable percentage forwards to a creator address, stored per merchant and enforced atomically within the pay entry point.
+ main
  main
  main
  main

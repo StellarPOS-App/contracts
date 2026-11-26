@@ -123,9 +123,20 @@ All settlement happens atomically in a single transaction—either the entire pa
 |---|---|---|
 | [`merchant-registry`](contracts/merchant-registry/src/lib.rs) | Who may get paid, where funds settle, which assets each merchant takes | `register`, `approve`, `suspend`, `accepts`, `settlement_of` |
  fix/issue-165-add-payment-splitting
+ fix/issue-165-add-payment-splitting
+
+ fix/issue-170-add-on-chain-terminal-registration
+| [`payment-processor`](contracts/payment-processor/src/lib.rs) | Atomic sale settlement: fee to treasury, net to merchant, one payment per order | `pay`, `pay_batch`, `refund`, `payment_for_order`, `quote` |
+
+ fix/issue-169-fix-negative-fee-underflow
+ main
 | [`payment-processor`](contracts/payment-processor/src/lib.rs) | Atomic sale settlement: fee to treasury, net to merchant, one payment per order | `pay`, `pay_batch`, `refund`, `payment_for_order`, `quote` |
 
 | [`payment-processor`](contracts/payment-processor/src/lib.rs) | Atomic sale settlement: fee to treasury, net to merchant, one payment per order | `pay`, `pay_batch`, `pay_with_royalties`, `refund`, `payment_for_order`, `quote`, `propose_param_change` |
+ main
+ fix/issue-165-add-payment-splitting
+
+ main
  main
 | [`loyalty-program`](contracts/loyalty-program/src/lib.rs) | Per-merchant points with automatic Bronze/Silver/Gold/Platinum tiers | `enroll`, `accrue`, `redeem`, `get_account` |
 | [`treasury`](contracts/treasury/src/lib.rs) | M-of-N multisig that holds protocol fees and can put idle funds into approved yield vaults | `propose`, `approve`, `execute`, `freeze`, `vaults` |
@@ -330,7 +341,30 @@ public issues.
 [MIT](LICENSE)
 
  fix/issue-165-add-payment-splitting
+ fix/issue-165-add-payment-splitting
 ## Group Payment Splitting\n\nA pay_split entry point allowing multiple payers to contribute to a single order atomically, reverting fully if any sub-transfer fails.
+
+ fix/issue-173-fix-expired-ledger-entry-read
+## Expired Ledger Entry Handling\n\nReading a ledger entry past its TTL returns None from get(). The contract must handle this explicitly rather than unwrapping, or extend TTL proactively on every read of long-lived records.
+
+ fix/issue-172-add-slippage-protection
+## Slippage Protection\n\nCross-currency conversions must accept a min_amount_out parameter. Without it, a price oracle update between quote and settlement can result in fewer tokens than expected.
+
+ fix/issue-170-add-on-chain-terminal-registration
+## On-Chain Terminal Registration\n\nPOS terminals should be registered on-chain so the backend can verify a payment was initiated from an authorized device, preventing fraudulent payment injection.
+
+ fix/issue-169-fix-negative-fee-underflow
+## Negative Fee Guard\n\nFee values must be validated as non-negative before arithmetic. A negative fee passed through bps_of wraps on underflow, producing a vastly inflated net payment to the merchant.
+
+ fix/issue-168-fix-cross-contract-reentrancy
+## Reentrancy via Callback\n\nAny function invoking an external contract must complete all internal state writes before the cross-contract call. Soroban does not prevent reentrancy at the contract level.
+
+ fix/issue-167-add-coverage-reports-to-ci
+## CI Coverage Reports\n\nThe CI pipeline should generate lcov coverage reports as artifacts, with a gate failing the build if line coverage drops below 80%.
+
+ fix/issue-166-optimize-direct-payment-hot-path
+## Direct Payment Hot Path\n\nA dedicated pay_direct entry point for same-asset payments with no loyalty or escrow can skip registry lookups and fee splits, reducing ledger operations.
+ main
 
  fix/issue-164-fix-admin-revocation-cleanup
 ## Admin Revocation Cleanup\n\nRevoking an admin must cancel all pending multisig proposals requiring that admin's signature to prevent orphaned votes.
@@ -351,6 +385,15 @@ public issues.
 ## POS Terms Glossary\n\nA glossary in docs/glossary.md (settlement, escrow, loyalty tier, BPS, SAC, order_ref) helps new contributors understand contract semantics without prior Stellar knowledge.
 
 ## Configurable Royalty Split\n\nMarketplace integrations need a royalty split where a configurable percentage forwards to a creator address, stored per merchant and enforced atomically within the pay entry point.
+ main
+ main
+ main
+ main
+ main
+ main
+ main
+ fix/issue-165-add-payment-splitting
+
  main
  main
  main

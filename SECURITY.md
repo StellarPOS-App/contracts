@@ -1,47 +1,44 @@
-# Security Policy
+# Security assumptions
 
-These contracts move real money. Please treat vulnerabilities seriously and
-report them privately.
+This repository contains Soroban contracts for StellarPOS. Deployments should be
+reviewed against the exact commit and built WASM before use.
 
-## Reporting a vulnerability
+## Trust model
 
-Use [GitHub private vulnerability reporting](https://github.com/StellarPOS-App/contracts/security/advisories/new).
-Do **not** open a public issue, pull request, or discussion.
+- The payment processor never custody-holds payer funds; the token contract moves
+  funds directly from the payer to the settlement account and treasury.
+- Payers, merchants, the registry, and configured integrations are external
+  callers. Their authorization and return values are not trusted implicitly.
+- The configured admin is trusted to pause the processor and change operational
+  parameters. Production deployments should use a multisig or governance
+  contract, not a single-key account.
+- The merchant registry is trusted to report active merchants and valid checkout
+  settlement accounts.
+- Accepted token contracts must implement the Soroban token interface correctly.
+  Transfers are checked by comparing the recipient balance before and after the
+  transfer; a non-crediting transfer is rejected.
 
-Please include:
+## Operational controls
 
-- The affected contract and function
-- A description of the impact (loss of funds, frozen funds, auth bypass, ...)
-- A reproduction, ideally a failing test using `soroban_sdk::testutils`
-- Any suggested fix
+- Payment creation is limited per payer per ledger. The admin can lower or raise
+  the limit within the contract's configured maximum.
+- Fee changes are capped by `MAX_FEE_BPS` and can be handed to the governance
+  council through the governance entrypoints.
+- Keep the admin, treasury, registry, token issuers, and deployed WASM hashes in
+  the deployment record. Rotate admin authority through a reviewed multisig
+  transaction.
 
-We aim to acknowledge reports within 3 business days and to agree a
-disclosure timeline with you before any details become public.
+## Known limitations
 
-## Scope
+- Merchant analytics are on-chain aggregates of recorded payments. The dispute
+  rate remains zero until dispute records are integrated into this processor.
+- A pause blocks new payment creation and refunds; operators must verify the
+  intended recovery procedure before unpausing.
+- Contract events are public. Do not put secrets or personal data in order
+  references, categories, callback payloads, or other contract arguments.
 
-In scope: everything under `contracts/`, and `scripts/deploy.sh` where it
-affects the security of a deployment.
+## Reporting
 
-Out of scope: issues in `soroban-sdk`, the Stellar network, or the Stellar
-CLI itself. Report those upstream to the
-[Stellar Development Foundation](https://stellar.org/grants-and-funding/bug-bounty).
-
-## Supported versions
-
-Only the latest release on `main` receives security fixes. The contracts
-have **not** been externally audited yet. Do not deploy to mainnet with
-significant value before an audit.
-
-## Security properties we rely on
-
-Report any way to break these:
-
-1. The payment processor never holds customer funds after a transaction.
-2. A `(merchant, order_ref)` pair can be paid at most once.
-3. Only a payment's settlement account can authorize its refund, and total
-   refunds never exceed the gross amount.
-4. No treasury withdrawal executes without `threshold` approvals from current
-   signers.
-5. Escrowed funds always leave through release, claim, refund, or a dispute
-   ruling. No path strands them.
+Do not disclose a suspected vulnerability in a public issue. Contact the
+maintainers privately with the affected contract, network, transaction or
+ledger evidence, reproduction steps, and a proposed severity.

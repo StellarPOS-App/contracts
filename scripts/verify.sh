@@ -39,12 +39,13 @@ wasm_name() {
     loyaltyProgram) echo loyalty_program ;;
     treasury) echo treasury ;;
     escrowService) echo escrow_service ;;
+    paymentStream) echo payment_stream ;;
   esac
 }
 
 failed=0
 printf '%-18s %-10s %s\n' CONTRACT RESULT 'SHA-256 (local)'
-for key in merchantRegistry paymentProcessor loyaltyProgram treasury escrowService; do
+for key in merchantRegistry paymentProcessor loyaltyProgram treasury escrowService paymentStream; do
   id="$(jq -r ".contracts.${key} // empty" "$MANIFEST")"
   local_wasm="$WASM_DIR/$(wasm_name "$key").wasm"
   if [[ -z "$id" ]]; then

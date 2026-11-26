@@ -535,13 +535,10 @@
               "key": {
                 "vec": [
                   {
-                    "symbol": "Order"
+                    "symbol": "MerchantPaymentCount"
                   },
                   {
                     "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
-                  },
-                  {
-                    "string": "A"
                   }
                 ]
               },
@@ -565,10 +562,40 @@
               "key": {
                 "vec": [
                   {
+                    "symbol": "Order"
+                  },
+                  {
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
+                  },
+                  {
+                    "string": "A"
+                  }
+                ]
+              },
+              "durability": "persistent",
+              "val": {
+                "u64": "6491328378884108817"
+              }
+            }
+          },
+          "ext": "v0"
+        },
+        "live_until": 1555200
+      },
+      {
+        "entry": {
+          "last_modified_ledger_seq": 0,
+          "data": {
+            "contract_data": {
+              "ext": "v0",
+              "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARQG5",
+              "key": {
+                "vec": [
+                  {
                     "symbol": "Payment"
                   },
                   {
-                    "u64": "1"
+                    "u64": "6491328378884108817"
                   }
                 ]
               },
@@ -612,7 +639,7 @@
                       "symbol": "id"
                     },
                     "val": {
-                      "u64": "1"
+                      "u64": "6491328378884108817"
                     }
                   },
                   {
@@ -726,12 +753,6 @@
                           },
                           {
                             "key": {
-                              "symbol": "loyalty"
-                            },
-                            "val": "void"
-                          },
-                          {
-                            "key": {
                               "symbol": "paused"
                             },
                             "val": {
@@ -761,12 +782,36 @@
                       "key": {
                         "vec": [
                           {
+                            "symbol": "NextPaymentId"
+                          }
+                        ]
+                      },
+                      "val": {
+                        "u64": "1"
+                      }
+                    },
+                    {
+                      "key": {
+                        "vec": [
+                          {
                             "symbol": "PaymentCount"
                           }
                         ]
                       },
                       "val": {
                         "u64": "1"
+                      }
+                    },
+                    {
+                      "key": {
+                        "vec": [
+                          {
+                            "symbol": "ReentrancyLock"
+                          }
+                        ]
+                      },
+                      "val": {
+                        "bool": false
                       }
                     }
                   ]

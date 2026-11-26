@@ -122,7 +122,11 @@ All settlement happens atomically in a single transaction—either the entire pa
 | Crate | Purpose | Key entry points |
 |---|---|---|
 | [`merchant-registry`](contracts/merchant-registry/src/lib.rs) | Who may get paid, where funds settle, which assets each merchant takes | `register`, `approve`, `suspend`, `accepts`, `settlement_of` |
+ fix/issue-169-fix-negative-fee-underflow
+| [`payment-processor`](contracts/payment-processor/src/lib.rs) | Atomic sale settlement: fee to treasury, net to merchant, one payment per order | `pay`, `pay_batch`, `refund`, `payment_for_order`, `quote` |
+
 | [`payment-processor`](contracts/payment-processor/src/lib.rs) | Atomic sale settlement: fee to treasury, net to merchant, one payment per order | `pay`, `pay_batch`, `pay_with_royalties`, `refund`, `payment_for_order`, `quote`, `propose_param_change` |
+ main
 | [`loyalty-program`](contracts/loyalty-program/src/lib.rs) | Per-merchant points with automatic Bronze/Silver/Gold/Platinum tiers | `enroll`, `accrue`, `redeem`, `get_account` |
 | [`treasury`](contracts/treasury/src/lib.rs) | M-of-N multisig that holds protocol fees and can put idle funds into approved yield vaults | `propose`, `approve`, `execute`, `freeze`, `vaults` |
 | [`escrow-service`](contracts/escrow-service/src/lib.rs) | Held payments for deliveries and pre-orders, with dispute resolution | `create`, `release`, `claim`, `raise_dispute`, `resolve`, `resolve_by_default` |
@@ -325,6 +329,9 @@ public issues.
 
 [MIT](LICENSE)
 
+ fix/issue-169-fix-negative-fee-underflow
+## Negative Fee Guard\n\nFee values must be validated as non-negative before arithmetic. A negative fee passed through bps_of wraps on underflow, producing a vastly inflated net payment to the merchant.
+
  fix/issue-168-fix-cross-contract-reentrancy
 ## Reentrancy via Callback\n\nAny function invoking an external contract must complete all internal state writes before the cross-contract call. Soroban does not prevent reentrancy at the contract level.
 
@@ -353,6 +360,7 @@ public issues.
 ## POS Terms Glossary\n\nA glossary in docs/glossary.md (settlement, escrow, loyalty tier, BPS, SAC, order_ref) helps new contributors understand contract semantics without prior Stellar knowledge.
 
 ## Configurable Royalty Split\n\nMarketplace integrations need a royalty split where a configurable percentage forwards to a creator address, stored per merchant and enforced atomically within the pay entry point.
+ main
  main
  main
  main

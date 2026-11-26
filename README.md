@@ -453,6 +453,9 @@ public issues.
 
 [MIT](LICENSE)
 
+ fix-issue-164
+<!-- fix: issue #164 - [Bug] Admin revocation does not clear pending admin actions -->
+
 ## Payment Authorization Delegation\n\nMerchants should be able to delegate payment authorization to sub-accounts without sharing admin keys, requiring new delegate and revoke_delegate entry points in merchant-registry.
 
 docs/                   architecture, deployment and authorization audit
@@ -526,6 +529,7 @@ public issues.
  main
  fix/issue-165-add-payment-splitting
 
+ main
  main
  main
  main

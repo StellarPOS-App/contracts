@@ -333,6 +333,9 @@ public issues.
 
 [MIT](LICENSE)
 
+ fix/issue-173-fix-expired-ledger-entry-read
+## Expired Ledger Entry Handling\n\nReading a ledger entry past its TTL returns None from get(). The contract must handle this explicitly rather than unwrapping, or extend TTL proactively on every read of long-lived records.
+
  fix/issue-172-add-slippage-protection
 ## Slippage Protection\n\nCross-currency conversions must accept a min_amount_out parameter. Without it, a price oracle update between quote and settlement can result in fewer tokens than expected.
 
@@ -370,6 +373,7 @@ public issues.
 ## POS Terms Glossary\n\nA glossary in docs/glossary.md (settlement, escrow, loyalty tier, BPS, SAC, order_ref) helps new contributors understand contract semantics without prior Stellar knowledge.
 
 ## Configurable Royalty Split\n\nMarketplace integrations need a royalty split where a configurable percentage forwards to a creator address, stored per merchant and enforced atomically within the pay entry point.
+ main
  main
  main
  main

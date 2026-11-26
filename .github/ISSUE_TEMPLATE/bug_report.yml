@@ -1,0 +1,54 @@
+name: Bug report
+description: Something is broken or behaves differently from the docs.
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please search existing issues first.
+        Security problems must not be reported here; see SECURITY.md.
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: A clear description of the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      placeholder: "e.g. v0.2.0 or a1b2c3d"
+  - type: dropdown
+    id: network
+    attributes:
+      label: Stellar network
+      options:
+        - Testnet
+        - Futurenet
+        - Mainnet
+        - Local / standalone
+        - Not network related
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs, transaction hashes, screenshots
+      description: Paste relevant output. Never paste secret keys or tokens.
+      render: shell

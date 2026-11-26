@@ -1,65 +1,33 @@
-# 👥 Contributors
+# Contributors
 
-We're grateful to all the amazing developers who have contributed to StellarPOS Surface!
+People who have contributed to this repository, in order of first
+contribution. Generated from the Git history and GitHub activity, so it lists
+real accounts only.
 
-## 🌟 Core Team
+| GitHub | Contributions |
+|---|---|
+| [@abayomiwav](https://github.com/abayomiwav) | Organization owner; project setup, issue backlog, workspace triage (#16) |
+| [@presidojay1](https://github.com/presidojay1) | Documentation updates |
+| [@Sadeequ](https://github.com/Sadeequ) | Automated dispute-resolution design for the escrow service (#15) |
+| [@circleboyslimited](https://github.com/circleboyslimited) | Workspace repair, contract rewrites, test suite, CI, and docs |
+| [@prodbycorne](https://github.com/prodbycorne) | Deployment verification tooling and deploy script fixes (#22) |
+| [@richardtoms100](https://github.com/richardtoms100) | Batch approval and rejection for merchant onboarding (#23) |
+| [@springswell](https://github.com/springswell) | One registry call per payment (-7.5% CPU) (#24) |
+| [@Smoothjane](https://github.com/Smoothjane) | Atomic batch payments (#25) |
+| [@Temi-suwa18](https://github.com/Temi-suwa18) | Payment processor allowlist for loyalty (#26) |
+| [@chonilius](https://github.com/chonilius) | Payment streams contract (#28) |
+| [@onejasonn](https://github.com/onejasonn) | Treasury yield vaults (#29) |
 
-| Avatar | Name | Role | Contributions |
-|--------|------|------|---------------|
-| 🧑‍💻 | **Alex Chen** | Lead Frontend Developer | Component architecture, UI/UX design |
-| 👩‍💻 | **Maya Patel** | Senior React Developer | State management, performance optimization |
-| 👨‍💻 | **Jordan Smith** | Mobile Specialist | Responsive design, PWA features |
-| 👩‍💻 | **Sam Kim** | UX Engineer | Accessibility, user experience |
-| 🧑‍💻 | **Taylor Wilson** | DevOps Engineer | Build tools, CI/CD pipeline |
+## Forks
 
-## 🚀 Active Contributors
+These 2 accounts have forked `StellarPOS-App/contracts` but have not yet had a
+pull request merged here (several have contributed to the other StellarPOS
+repositories). Once a pull request from a fork is merged, its owner moves to
+the table above. Last updated 24 October 2026.
 
-| Avatar | Name | Contributions | Recent Work |
-|--------|------|---------------|-------------|
-| 👩‍💻 | **Elena Vasquez** | 15+ commits | PWA implementation, service workers |
-| 👨‍💻 | **Raj Patel** | 12+ commits | Search functionality, performance |
-| 🧑‍💻 | **Lisa Zhang** | 10+ commits | Authentication, security features |
-| 👩‍💻 | **Carlos Mendoza** | 8+ commits | Mobile responsiveness |
-| 👨‍💻 | **Aisha Johnson** | 7+ commits | Accessibility improvements |
+| GitHub | Fork | Forked on |
+|---|---|---|
+| [@abayomicornelius](https://github.com/abayomicornelius) | [abayomicornelius/stellarPOS-contracts](https://github.com/abayomicornelius/stellarPOS-contracts) | 18 Jun 2026 |
+| [@Derinsolababy](https://github.com/Derinsolababy) | [Derinsolababy/contracts](https://github.com/Derinsolababy/contracts) | 4 Oct 2026 |
 
-## 🎯 Contribution Areas
-
-- **Frontend Development** (React, TypeScript)
-- **UI/UX Design** (Tailwind, Responsive)
-- **Performance Optimization** 
-- **Accessibility** (WCAG compliance)
-- **Testing** (Unit & E2E tests)
-- **Documentation** (Guides, tutorials)
-- **Internationalization** (i18n support)
-- **Security** (Authentication, validation)
-
-## 📈 Contributor Stats
-
-- **Total Contributors**: 10+
-- **Total Commits**: 90+
-- **Active Contributors (last month)**: 8
-- **Lines of Code**: 15,000+
-- **Test Coverage**: 85%+
-
-## 🤝 How to Contribute
-
-1. **Fork** the repository
-2. **Clone** your fork locally
-3. **Create** a feature branch
-4. **Make** your changes
-5. **Test** thoroughly
-6. **Submit** a pull request
-
-See our [Contributing Guide](./CONTRIBUTING.md) for detailed instructions!
-
-## 🏆 Recognition
-
-All contributors are recognized in our:
-- README acknowledgments
-- Release notes
-- Annual contributor awards
-- Community hall of fame
-
----
-
-**Want to join our contributor community?** Check out our [Good First Issues](https://github.com/StellarPOS-App/stellarPOS-surface/labels/good%20first%20issue) to get started! 🚀
+To be added, open a pull request. Your first merged contribution counts.

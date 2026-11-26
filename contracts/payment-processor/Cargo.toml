@@ -1,20 +1,19 @@
 [package]
 name = "payment-processor"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-soroban-sdk = { workspace = true }
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
 
 [lib]
 crate-type = ["cdylib", "rlib"]
+doctest = false
 
-[profile.release]
-opt-level = "z"
-overflow-checks = true
-debug = 0
-strip = "symbols"
-debug-assertions = false
-panic = "abort"
-codegen-units = 1
-lto = true
+[dependencies]
+soroban-sdk = { workspace = true }
+shared = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
+merchant-registry = { workspace = true }
+loyalty-program = { workspace = true }

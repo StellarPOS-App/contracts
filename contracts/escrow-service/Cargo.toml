@@ -1,26 +1,17 @@
 [package]
 name = "escrow-service"
-version = "0.1.0"
-edition = "2021"
-
-[workspace]
-
-[dependencies]
-soroban-sdk = { version = "21.0.0", features = ["testutils"] }
-shared = { path = "../shared" }
-ed25519-dalek = { version = "2.0.0" }
-curve25519-dalek = { version = "4.1.2" }
-ethnum = { version = "1.5.3" }
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
 
 [lib]
 crate-type = ["cdylib", "rlib"]
+doctest = false
 
-[profile.release]
-opt-level = "z"
-overflow-checks = true
-debug = 0
-strip = "symbols"
-debug-assertions = false
-panic = "abort"
-codegen-units = 1
-lto = true
+[dependencies]
+soroban-sdk = { workspace = true }
+shared = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }

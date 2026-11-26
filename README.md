@@ -1,391 +1,544 @@
-# 📋 StellarPOS Smart Contracts
+# StellarPOS Contracts
 
-Comprehensive Soroban smart contracts for StellarPOS payment processing, business logic, and financial operations on the Stellar blockchain.
+Soroban smart contracts for StellarPOS, a point-of-sale system for merchants
+who accept payment on the Stellar network.
+ fix/issue-174-add-payment-authorization-delegation
 
-## Overview
+[![CI](https://github.com/StellarPOS-App/contracts/actions/workflows/ci.yml/badge.svg)](https://github.com/StellarPOS-App/contracts/actions/workflows/ci.yml)
+![soroban-sdk](https://img.shields.io/badge/soroban--sdk-27.0.6-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
 
-StellarPOS Smart Contracts provide a complete suite of blockchain-based business logic for point-of-sale operations, including payment processing, escrow services, loyalty programs, and financial management.
+This repository is one of three:
 
-## Contracts Overview
+| Repository | What it is |
+|---|---|
+| [`contracts`](https://github.com/StellarPOS-App/contracts) (this repo) | On-chain settlement, loyalty, treasury and escrow |
+| [`backend`](https://github.com/StellarPOS-App/backend) | REST + WebSocket API: catalog, sales, checkout, payment matching |
+| [`surface`](https://github.com/StellarPOS-App/surface) | The point-of-sale web app cashiers and managers use |
 
-### Payment Processor Contract
-Core payment processing contract handling:
-- **Multi-Asset Payments**: XLM and custom token support
-- **Atomic Transactions**: Guaranteed payment execution
-- **Fee Management**: Configurable transaction fees
-- **Payment Verification**: Cryptographic proof of payment
-- **Refund Processing**: Automated refund mechanisms
+## The contracts
 
-### Escrow Service Contract
-Secure escrow services for complex transactions:
-- **Multi-Party Escrow**: Support for multiple parties
-- **Time-locked Releases**: Automated time-based releases
-- **Dispute Resolution**: Built-in arbitration system
-- **Partial Releases**: Milestone-based payments
-- **Emergency Recovery**: Admin recovery mechanisms
+| Crate | Purpose | Key entry points |
+|---|---|---|
+| [`merchant-registry`](contracts/merchant-registry/src/lib.rs) | Who may get paid, where funds settle, which assets each merchant takes | `register`, `approve`, `suspend`, `accepts`, `settlement_of` |
+| [`payment-processor`](contracts/payment-processor/src/lib.rs) | Atomic sale settlement: fee to treasury, net to merchant, one payment per order | `pay`, `pay_batch`, `refund`, `payment_for_order`, `quote` |
+| [`loyalty-program`](contracts/loyalty-program/src/lib.rs) | Per-merchant points with automatic Bronze/Silver/Gold/Platinum tiers | `enroll`, `accrue`, `redeem`, `get_account` |
+| [`treasury`](contracts/treasury/src/lib.rs) | M-of-N multisig that holds protocol fees and can put idle funds into approved yield vaults | `propose`, `approve`, `execute`, `freeze`, `vaults` |
+| [`escrow-service`](contracts/escrow-service/src/lib.rs) | Held payments for deliveries and pre-orders, with dispute resolution | `create`, `release`, `claim`, `raise_dispute`, `resolve`, `resolve_by_default` |
+| [`payment-stream`](contracts/payment-stream/src/lib.rs) | Per-second payment streams for subscriptions, rent and payroll; cancel splits earned and unearned exactly | `create`, `withdraw`, `cancel`, `available` |
+| [`shared`](contracts/shared/src/lib.rs) | Library, not deployed: basis-point fee math and storage TTL helpers | `bps_of`, `split_fee`, `extend_*` |
 
-### Loyalty Program Contract
-Customer loyalty and rewards management:
-- **Point Accumulation**: Earn points on purchases
-- **Tier Management**: Customer loyalty tiers
-- **Reward Redemption**: Points-to-value conversion
-- **Expiration Handling**: Automatic point expiration
-- **Bonus Campaigns**: Time-limited promotions
+### How a sale settles
 
-### Treasury Management Contract
-Business treasury and financial operations:
-- **Multi-signature Wallets**: Secure fund management
-- **Automated Distributions**: Revenue sharing
-- **Reserve Management**: Maintain operating reserves
-- **Yield Generation**: Stake rewards integration
-- **Financial Reporting**: On-chain audit trails
-
-### Merchant Registry Contract
-Merchant onboarding and management:
-- **Merchant Registration**: Decentralized merchant onboarding
-- **KYC Integration**: Identity verification hooks
-- **Fee Structure Management**: Per-merchant fee tiers
-- **Status Management**: Active/inactive merchant states
-- **Compliance Tracking**: Regulatory compliance monitoring
-
-## Technology Stack
-
-- **Smart Contract Platform**: Soroban (Stellar)
-- **Programming Language**: Rust
-- **Development Framework**: Soroban CLI
-- **Testing Framework**: Soroban Test Framework
-- **Documentation**: Cargo Doc
-- **Deployment**: Stellar Testnet & Mainnet
-- **Monitoring**: Stellar Expert integration
-
-## Project Structure
-
-```
-contracts/
-├── payment-processor/   # Core payment processing
-│   ├── src/
-│   │   ├── lib.rs      # Main contract logic
-│   │   ├── types.rs    # Data structures
-│   │   ├── storage.rs  # Storage management
-│   │   ├── events.rs   # Event definitions
-│   │   └── utils.rs    # Utility functions
-│   ├── Cargo.toml
-│   └── README.md
-├── escrow-service/      # Escrow and dispute resolution
-│   ├── src/
-│   │   ├── lib.rs
-│   │   ├── escrow.rs   # Escrow logic
-│   │   ├── dispute.rs  # Dispute resolution
-│   │   └── timelock.rs # Time-based releases
-│   ├── Cargo.toml
-│   └── README.md
-├── loyalty-program/     # Customer loyalty system
-│   ├── src/
-│   │   ├── lib.rs
-│   │   ├── points.rs   # Points management
-│   │   ├── tiers.rs    # Tier system
-│   │   └── rewards.rs  # Reward redemption
-│   ├── Cargo.toml
-│   └── README.md
-├── treasury/           # Treasury management
-│   ├── src/
-│   │   ├── lib.rs
-│   │   ├── multisig.rs # Multi-signature logic
-│   │   ├── treasury.rs # Treasury operations
-│   │   └── yield.rs    # Yield generation
-│   ├── Cargo.toml
-│   └── README.md
-├── merchant-registry/  # Merchant management
-│   ├── src/
-│   │   ├── lib.rs
-│   │   ├── registry.rs # Merchant registration
-│   │   ├── kyc.rs      # KYC integration
-│   │   └── fees.rs     # Fee management
-│   ├── Cargo.toml
-│   └── README.md
-├── shared/             # Shared libraries
-│   ├── src/
-│   │   ├── lib.rs
-│   │   ├── types.rs    # Common types
-│   │   ├── utils.rs    # Shared utilities
-│   │   └── errors.rs   # Error definitions
-│   ├── Cargo.toml
-│   └── README.md
-├── scripts/            # Deployment and utility scripts
-├── tests/              # Integration tests
-└── docs/               # Documentation
+```mermaid
+sequenceDiagram
+    participant C as Customer wallet
+    participant P as payment-processor
+    participant R as merchant-registry
+    participant T as Token (SAC)
+    participant L as loyalty-program
+    C->>P: pay(payer, merchant, asset, amount, order_ref)
+    P->>R: accepts(merchant, asset)?
+    R-->>P: true
+    P->>R: settlement_of(merchant)
+    P->>T: transfer(payer -> settlement, net)
+    P->>T: transfer(payer -> treasury, fee)
+    P->>L: accrue(processor, merchant, payer, amount)
+    P-->>C: payment id (event: payment_settled)
 ```
 
+All transfers happen inside one transaction, so either the whole sale settles
+or nothing moves. The processor never holds customer funds, and the
+`(merchant, order_ref)` pair is unique, so a retried checkout cannot charge
+twice.
 
+### Design rules
+
+These hold across every contract:
+
+- **Typed errors, no panics on user input.** Each contract has a
+  `#[contracterror]` enum. Clients get a stable numeric code for every
+  rejection.
+- **Events for every state change**, defined with `#[contractevent]`, so the
+  backend and indexers can follow everything without polling storage.
+- **Emergency pause.** Registry, processor, loyalty and escrow can be paused
+  by their admin. Escrow refunds still work while paused, because returning
+  funds to a buyer is always safe. The treasury uses a multisig freeze
+  instead.
+- **Checked arithmetic.** Fee and split math goes through `shared::bps_of`,
+  which returns `None` on overflow or on more than 100%.
+- **TTL management.** Every read or write of a long-lived record extends its
+  TTL, so active data is never archived.
+
+More detail on each contract, including state machines and storage layout, is
+in [docs/architecture.md](docs/architecture.md).
+
+## Getting started
 
 ### Prerequisites
-- Rust 1.70+
-- Soroban CLI
-- Stellar CLI
-- Git
 
-### Installation
+- Rust stable with the `wasm32v1-none` target (pinned in
+  [`rust-toolchain.toml`](rust-toolchain.toml), installed automatically by
+  rustup)
+- [Stellar CLI](https://developers.stellar.org/docs/tools/cli) 23 or newer,
+  for building optimized wasm and deploying
+
+### Build and test
 
 ```bash
-# Clone the repository
 git clone https://github.com/StellarPOS-App/contracts.git
 cd contracts
 
-# Install Soroban CLI (if not installed)
-cargo install --locked soroban-cli
-
-# Build all contracts
-make build
-
-# Run tests
-make test
-
-# Deploy to testnet
-make deploy-testnet
+make test      # 63 tests across all crates
+make check     # rustfmt + clippy -D warnings + tests (what CI runs)
+make build     # optimized wasm in target/wasm32v1-none/release/
+make sizes     # wasm sizes, all well under the 64 KB limit
+make verify    # check a deployment runs exactly this source (NETWORK=testnet)
 ```
 
-### Environment Setup
+### Deploy to testnet
 
 ```bash
-# Setup Stellar testnet
-soroban config network add testnet \
-  --rpc-url https://soroban-testnet.stellar.org:443 \
-  --network-passphrase "Test SDF Network ; September 2015"
-
-# Generate test identity
-soroban config identity generate alice
-soroban config identity address alice
-
-# Fund test account
-soroban config identity fund alice --network testnet
+make deploy                      # NETWORK=testnet, FEE_BPS=100 by default
+NETWORK=testnet FEE_BPS=250 make deploy
 ```
 
-## 📋 Contract Functions
+[`scripts/deploy.sh`](scripts/deploy.sh) creates and funds a deployer
+identity if needed, deploys all five contracts, initializes them, connects
+the loyalty program to the processor, and writes every contract ID to
+`deployments/<network>.json`. See [docs/deployment.md](docs/deployment.md)
+for the post-deploy checklist (multisig rotation, merchant onboarding) and
+example `stellar contract invoke` calls.
 
-### Payment Processor
+## Project layout
 
-```rust
-// Initialize payment processor
-pub fn initialize(env: Env, admin: Address, fee_rate: u32) -> Result<(), Error>
-
-// Process payment
-pub fn process_payment(
-    env: Env,
-    payer: Address,
-    merchant: Address,
-    amount: i128,
-    asset: Address,
-    memo: String
-) -> Result<u64, Error>
-
-// Verify payment
-pub fn verify_payment(env: Env, payment_id: u64) -> Result<PaymentStatus, Error>
-
-// Process refund
-pub fn process_refund(
-    env: Env,
-    payment_id: u64,
-    refund_amount: i128,
-    reason: String
-) -> Result<u64, Error>
 ```
+=======
 
-### Escrow Service
+[![CI](https://github.com/StellarPOS-App/contracts/actions/workflows/ci.yml/badge.svg)](https://github.com/StellarPOS-App/contracts/actions/workflows/ci.yml)
+[![Coverage](https://codecov.io/gh/StellarPOS-App/contracts/graph/badge.svg)](https://codecov.io/gh/StellarPOS-App/contracts)
+![soroban-sdk](https://img.shields.io/badge/soroban--sdk-27.0.6-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
 
-```rust
-// Create escrow
-pub fn create_escrow(
-    env: Env,
-    buyer: Address,
-    seller: Address,
-    amount: i128,
-    asset: Address,
-    terms: EscrowTerms
-) -> Result<u64, Error>
+This repository is one of three:
 
-// Release funds
-pub fn release_funds(env: Env, escrow_id: u64) -> Result<(), Error>
+| Repository | What it is |
+|---|---|
+| [`contracts`](https://github.com/StellarPOS-App/contracts) (this repo) | On-chain settlement, loyalty, treasury and escrow |
+| [`backend`](https://github.com/StellarPOS-App/backend) | REST + WebSocket API: catalog, sales, checkout, payment matching |
+| [`surface`](https://github.com/StellarPOS-App/surface) | The point-of-sale web app cashiers and managers use |
 
-// Raise dispute
-pub fn raise_dispute(
-    env: Env,
-    escrow_id: u64,
-    reason: String
-) -> Result<(), Error>
+## Architecture Overview
 
-// Resolve dispute
-pub fn resolve_dispute(
-    env: Env,
-    escrow_id: u64,
-    resolution: DisputeResolution
-) -> Result<(), Error>
-```
-
-### Loyalty Program
-
-```rust
-// Register customer
-pub fn register_customer(env: Env, customer: Address) -> Result<(), Error>
-
-// Award points
-pub fn award_points(
-    env: Env,
-    customer: Address,
-    points: u64,
-    transaction_id: String
-) -> Result<(), Error>
-
-// Redeem points
-pub fn redeem_points(
-    env: Env,
-    customer: Address,
-    points: u64
-) -> Result<i128, Error>
-
-// Get customer tier
-pub fn get_customer_tier(env: Env, customer: Address) -> Result<CustomerTier, Error>
-```
-
-## 🧪 Testing
-
-```bash
-# Run all tests
-make test
-
-# Run specific contract tests
-cargo test -p payment-processor
-
-# Run integration tests
-cargo test --test integration
-
-# Test with coverage
-cargo tarpaulin --out Html
-
-# Benchmark tests
-cargo bench
-```
-
-## Deployment
-
-### Testnet Deployment
-
-```bash
-# Deploy all contracts to testnet
-make deploy-testnet
-
-# Deploy specific contract
-soroban contract deploy \
-  --wasm target/wasm32-unknown-unknown/release/payment_processor.wasm \
-  --network testnet \
-  --source alice
-```
-
-### Mainnet Deployment
-
-```bash
-# Build optimized contracts
-make build-release
-
-# Deploy to mainnet
-make deploy-mainnet
-
-# Verify deployment
-soroban contract invoke \
-  --id CONTRACT_ID \
-  --network mainnet \
-  --source alice \
-  -- get_version
-```
-
-## Security Features
-
-### Access Control
-- **Role-based Permissions**: Admin, merchant, customer roles
-- **Multi-signature Support**: Secure admin operations
-- **Time-lock Mechanisms**: Delayed sensitive operations
-- **Emergency Pause**: Circuit breaker functionality
-
-### Financial Security
-- **Overflow Protection**: Safe arithmetic operations
-- **Reentrancy Guards**: Prevent reentrancy attacks
-- **Input Validation**: Comprehensive parameter checking
-- **Rate Limiting**: Transaction frequency controls
-
-### Audit Trail
-- **Event Logging**: Comprehensive event emission
-- **State Tracking**: Complete state change history
-- **Transaction Receipts**: Cryptographic proofs
-- **Compliance Reporting**: Regulatory compliance data
-
-## 📊 Contract Interactions
+The StellarPOS system is composed of six smart contracts that work together to provide a complete point-of-sale solution on Stellar:
 
 ```mermaid
 graph TB
-    A[Frontend] --> B[Backend API]
-    B --> C[Payment Processor]
-    B --> D[Escrow Service]
-    B --> E[Loyalty Program]
-    C --> F[Treasury]
-    D --> F
-    E --> F
-    G[Merchant Registry] --> C
-    G --> D
-    H[Stellar Network] --> C
-    H --> D
-    H --> E
-    H --> F
+    subgraph External Actors
+        CUSTOMER[👤 Customer Wallet]
+        MERCHANT[🏪 Merchant]
+        ADMIN[🔧 Admin/Council]
+        ARBITER[⚖️ Arbiter]
+    end
+
+    subgraph Core Settlement
+        PP[💳 Payment Processor<br/>settlement & refunds]
+        REG[📋 Merchant Registry<br/>approval & assets]
+        TREAS[🏦 Treasury<br/>M-of-N multisig]
+    end
+
+    subgraph Value-Add Services
+        LOY[🎁 Loyalty Program<br/>points & tiers]
+        ESC[🤝 Escrow Service<br/>held payments & disputes]
+        STREAM[⏱️ Payment Stream<br/>per-second flows]
+    end
+
+    subgraph Infrastructure
+        TOKEN[🪙 Stellar Asset<br/>SAC token]
+        VAULT[📦 Yield Vault<br/>optional DeFi]
+    end
+
+    %% Customer interactions
+    CUSTOMER -->|pay/pay_batch| PP
+    CUSTOMER -->|create/release| ESC
+    CUSTOMER -->|create stream| STREAM
+    CUSTOMER -->|redeem points| LOY
+
+    %% Merchant interactions
+    MERCHANT -->|register| REG
+    MERCHANT -->|refund| PP
+    MERCHANT -->|claim escrow| ESC
+    MERCHANT -->|enroll customers| LOY
+    MERCHANT -->|co-sign redemption| LOY
+
+    %% Admin interactions
+    ADMIN -->|approve/suspend| REG
+    ADMIN -->|configure| PP
+    ADMIN -->|propose/approve| TREAS
+    ADMIN -->|pause contracts| PP
+    ADMIN -->|pause contracts| REG
+    ADMIN -->|pause contracts| LOY
+    ADMIN -->|pause contracts| ESC
+
+    %% Arbiter interactions
+    ARBITER -->|resolve dispute| ESC
+
+    %% Core contract interactions
+    PP -->|accepts?<br/>settlement_of?| REG
+    PP -->|accrue points| LOY
+    PP -->|fee transfer| TREAS
+    PP -->|transfer net| TOKEN
+    PP -->|transfer fee| TOKEN
+
+    %% Escrow flows
+    ESC -->|lock/release funds| TOKEN
+    ESC -.->|independent| PP
+
+    %% Stream flows
+    STREAM -->|withdraw/cancel| TOKEN
+
+    %% Treasury operations
+    TREAS -->|withdraw| TOKEN
+    TREAS -->|deposit/withdraw| VAULT
+    VAULT -->|yield| TOKEN
+
+    %% Styling
+    classDef customer fill:#e1f5ff,stroke:#0288d1,stroke-width:2px
+    classDef merchant fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    classDef admin fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef core fill:#c8e6c9,stroke:#388e3c,stroke-width:3px
+    classDef service fill:#ffe0b2,stroke:#e64a19,stroke-width:2px
+    classDef infra fill:#f5f5f5,stroke:#616161,stroke-width:2px
+    
+    class CUSTOMER customer
+    class MERCHANT merchant
+    class ADMIN,ARBITER admin
+    class PP,REG,TREAS core
+    class LOY,ESC,STREAM service
+    class TOKEN,VAULT infra
 ```
 
-## 📚 Documentation
+### Key Relationships
 
-- [Contract Architecture](./docs/architecture.md)
-- [API Reference](./docs/api.md)
-- [Integration Guide](./docs/integration.md)
-- [Security Guidelines](./docs/security.md)
-- [Deployment Guide](./docs/deployment.md)
-- [Troubleshooting](./docs/troubleshooting.md)
+- **Payment Processor** is the orchestrator: it validates merchants through the registry, transfers funds via tokens, sends fees to treasury, and accrues loyalty points
+- **Merchant Registry** is the source of truth for who can receive payments and which assets they accept
+- **Treasury** is a fully independent M-of-N multisig that receives protocol fees and can deploy idle funds to yield vaults
+- **Loyalty Program** maintains per-merchant customer accounts with automatic tier upgrades (Bronze → Silver → Gold → Platinum)
+- **Escrow Service** operates independently for held payments with dispute resolution
+- **Payment Stream** enables per-second continuous payments for subscriptions and payroll
 
-## 🤝 Contributing
+All settlement happens atomically in a single transaction—either the entire payment succeeds (fees to treasury, net to merchant, points accrued) or nothing moves.
 
-We welcome contributions from blockchain developers worldwide! 🌍⛓️
+## The contracts
 
-### Quick Start
-1. **⭐ Star** this repository if you find it helpful
-2. **🍴 Fork** the repository to your GitHub account  
-3. **📥 Clone** your fork locally
-4. **🌿 Create** a feature branch (`git checkout -b feature/amazing-feature`)
-5. **✨ Make** your changes and add tests
-6. **✅ Commit** your changes (`git commit -m 'Add some amazing feature'`)
-7. **📤 Push** to your branch (`git push origin feature/amazing-feature`)
-8. **🔄 Open** a Pull Request
+| Crate | Purpose | Key entry points |
+|---|---|---|
+| [`merchant-registry`](contracts/merchant-registry/src/lib.rs) | Who may get paid, where funds settle, which assets each merchant takes | `register`, `approve`, `suspend`, `accepts`, `settlement_of` |
+ fix/issue-165-add-payment-splitting
+ fix/issue-165-add-payment-splitting
 
-### 👥 Our Contributors
-We have an amazing community of **10+ active blockchain contributors**! See our [Contributors Guide](./CONTRIBUTORS.md) for the full list.
+ fix/issue-170-add-on-chain-terminal-registration
+| [`payment-processor`](contracts/payment-processor/src/lib.rs) | Atomic sale settlement: fee to treasury, net to merchant, one payment per order | `pay`, `pay_batch`, `refund`, `payment_for_order`, `quote` |
 
-### 🎯 Ways to Contribute
-- 🐛 **Report contract bugs** and vulnerabilities
-- 💡 **Suggest improvements** to smart contract logic
-- 📝 **Improve documentation** and code comments
-- 🧪 **Write comprehensive tests** and security audits
-- 🔒 **Enhance security** features and access controls
-- ⚡ **Optimize gas usage** and contract efficiency
-- 🔍 **Add monitoring** and analytics features
-- 🛠️ **Improve deployment** scripts and tooling
+ fix/issue-169-fix-negative-fee-underflow
+ main
+| [`payment-processor`](contracts/payment-processor/src/lib.rs) | Atomic sale settlement: fee to treasury, net to merchant, one payment per order | `pay`, `pay_batch`, `refund`, `payment_for_order`, `quote` |
 
-### 📋 Good First Issues
-New to Soroban development? Check out our [Good First Issues](https://github.com/StellarPOS-App/stellarPOS-contracts/labels/good%20first%20issue)!
+| [`payment-processor`](contracts/payment-processor/src/lib.rs) | Atomic sale settlement: fee to treasury, net to merchant, one payment per order | `pay`, `pay_batch`, `pay_with_royalties`, `refund`, `payment_for_order`, `quote`, `propose_param_change` |
+ main
+ fix/issue-165-add-payment-splitting
 
-**Detailed Contributing Guide**: [CONTRIBUTING.md](./CONTRIBUTING.md)
+ main
+ main
+| [`loyalty-program`](contracts/loyalty-program/src/lib.rs) | Per-merchant points with automatic Bronze/Silver/Gold/Platinum tiers | `enroll`, `accrue`, `redeem`, `get_account` |
+| [`treasury`](contracts/treasury/src/lib.rs) | M-of-N multisig that holds protocol fees and can put idle funds into approved yield vaults | `propose`, `approve`, `execute`, `freeze`, `vaults` |
+| [`escrow-service`](contracts/escrow-service/src/lib.rs) | Held payments for deliveries and pre-orders, with dispute resolution | `create`, `release`, `claim`, `raise_dispute`, `resolve`, `resolve_by_default` |
+| [`payment-stream`](contracts/payment-stream/src/lib.rs) | Per-second payment streams for subscriptions, rent and payroll; cancel splits earned and unearned exactly | `create`, `withdraw`, `cancel`, `available` |
+| [`shared`](contracts/shared/src/lib.rs) | Library, not deployed: basis-point fee math and storage TTL helpers | `bps_of`, `split_fee`, `extend_*` |
 
-## 📄 License
+## Contract Architecture
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+The following diagram shows how the contracts interact with each other and the core entities:
 
-## 🔗 Links
+```
+                                    ┌─────────────────┐
+                                    │   Customer      │
+                                    │   Wallet        │
+                                    └────────┬────────┘
+                                             │
+                    ┌────────────────────────┼────────────────────────┐
+                    │                        │                        │
+                    ▼                        ▼                        ▼
+         ┌──────────────────┐    ┌──────────────────┐    ┌──────────────────┐
+         │  payment-        │    │  escrow-         │    │  payment-        │
+         │  processor       │    │  service         │    │  stream          │
+         └────────┬─────────┘    └──────────────────┘    └──────────────────┘
+                  │                       │
+         ┌────────┼───────────┐          │ (disputes)
+         │        │           │          │
+         ▼        ▼           ▼          ▼
+    ┌────────┐ ┌──────┐  ┌────────┐  ┌────────┐
+    │merchant│ │Token │  │loyalty-│  │arbiter │
+    │registry│ │ SAC  │  │program │  │ (EOA)  │
+    └────────┘ └──────┘  └────────┘  └────────┘
+         │         │          │
+         │         ▼          │
+         │    ┌──────────┐   │
+         └───▶│ treasury │◀──┘
+              │(multisig)│
+              └──────────┘
+                    │
+                    ▼
+           ┌─────────────────┐
+           │  Protocol Fees  │
+           │  & Yield Vaults │
+           └─────────────────┘
 
-- [Frontend Repository](https://github.com/StellarPOS-App/surface)
-- [Backend Repository](https://github.com/StellarPOS-App/backend)
-- [Soroban Documentation](https://soroban.stellar.org/)
-- [Stellar Developer Portal](https://developers.stellar.org/)
+Legend:
+  ─────▶  Direct contract calls / queries
+  │       Data flow / dependency
+  
+Key Relationships:
+  • payment-processor: checks merchant-registry, moves tokens, accrues loyalty points
+  • escrow-service: holds funds, calls arbiter for disputes
+  • loyalty-program: tracks customer points per merchant
+  • treasury: receives protocol fees, controlled by multisig
+  • merchant-registry: authorizes who can receive payments
+  • payment-stream: continuous per-second payments (subscriptions, payroll)
+```
 
+### How a sale settles
+
+```mermaid
+sequenceDiagram
+    participant C as Customer wallet
+    participant P as payment-processor
+    participant R as merchant-registry
+    participant T as Token (SAC)
+    participant L as loyalty-program
+    C->>P: pay(payer, merchant, asset, amount, order_ref)
+    P->>R: accepts(merchant, asset)?
+    R-->>P: true
+    P->>R: settlement_of(merchant)
+    P->>T: transfer(payer -> settlement, net)
+    P->>T: transfer(payer -> treasury, fee)
+    P->>L: accrue(processor, merchant, payer, amount)
+    P-->>C: payment id (event: payment_settled)
+```
+
+All transfers happen inside one transaction, so either the whole sale settles
+or nothing moves. The processor never holds customer funds, and the
+`(merchant, order_ref)` pair is unique, so a retried checkout cannot charge
+twice.
+
+### Design rules
+
+These hold across every contract:
+
+- **Typed errors, no panics on user input.** Each contract has a
+  `#[contracterror]` enum. Clients get a stable numeric code for every
+  rejection.
+- **Events for every state change**, defined with `#[contractevent]`, so the
+  backend and indexers can follow everything without polling storage.
+- **Emergency pause.** Registry, processor, loyalty and escrow can be paused
+  by their admin. Escrow refunds still work while paused, because returning
+  funds to a buyer is always safe. The treasury uses a multisig freeze
+  instead.
+- **Checked arithmetic.** Fee and split math goes through `shared::bps_of`,
+  which returns `None` on overflow or on more than 100%.
+- **TTL management.** Every read or write of a long-lived record extends its
+  TTL, so active data is never archived.
+
+More detail on each contract, including state machines and storage layout, is
+in [docs/architecture.md](docs/architecture.md).
+
+## Glossary
+
+Point-of-sale terms used across the contracts and docs:
+
+| Term | Meaning |
+|---|---|
+| **Merchant** | A business registered in `merchant-registry`. Only approved, active merchants can be paid. |
+| **Settlement account** | The address a merchant's sales are paid into (can differ from the merchant's own address). Refunds are sent from it. |
+| **Order reference (`order_ref`)** | The POS order number. Each merchant can be paid once per order reference, so a double-tapped "Pay" never charges twice. |
+| **Settlement** | Completing a sale on-chain: the fee goes to the treasury and the net goes to the settlement account, in one transaction. |
+| **Gross / net amount** | Gross is what the customer pays; net is what remains after the protocol fee. |
+| **Basis points (bps)** | Hundredths of a percent: 100 bps = 1%, 10,000 bps = 100%. Fees and splits are set in bps. |
+| **Protocol fee (`fee_bps`)** | The platform's cut of each sale, capped at 10% (`MAX_FEE_BPS`), paid to the treasury. |
+| **Royalty split** | Extra recipients (artists, referrers) paid a bps share of the net amount on a marketplace sale; the seller gets the rest. |
+| **Quote** | A preview of the fee/net split for an amount, shown at checkout before paying. |
+| **Batch payment** | Several orders paid by one customer in one all-or-nothing transaction (`pay_batch`). |
+| **Refund (partial / full)** | Money sent back from the settlement account to the payer, up to the gross amount. Fees and royalties are not returned. |
+| **Treasury** | The M-of-N multisig contract that holds protocol fees. |
+| **Escrow** | A payment held by the contract until delivery: released by the buyer or claimable by the seller after `release_at`. |
+| **Release time (`release_at`)** | When escrowed funds become claimable by the seller; buyers can open a dispute until then. |
+| **Dispute / arbitration window** | A dispute freezes an escrow; the arbiter must rule within the arbitration window or a default rule resolves it. |
+| **Payment stream** | Money paid per second (subscriptions, rent, payroll); cancelling splits earned and unearned amounts exactly. |
+| **Loyalty tier** | Bronze, Silver, Gold or Platinum: a customer's level with a merchant, which boosts points earned. |
+| **Governance council** | Once enabled, the members who must approve fee-rate and treasury changes instead of the admin alone. |
+| **TTL / bump** | Soroban storage expires unless extended; contracts bump records whenever they are read or written. |
+
+Escrow seller payouts have a one-hour minimum lock by default. The admin can
+set a longer minimum with `set_min_lock_period(seconds)`. New escrows record the
+policy at funding and require `release_at` at or after the lock ends. Buyer-only
+refunds can return funds before unlock. Each escrow pays out in the asset it
+recorded at funding. Merchant registration leaves payment statistics absent
+until the first successful payment. The payment count reads as zero in the meantime.
+
+
+## Getting started
+
+### Prerequisites
+
+- Rust stable with the `wasm32v1-none` target (pinned in
+  [`rust-toolchain.toml`](rust-toolchain.toml), installed automatically by
+  rustup)
+- [Stellar CLI](https://developers.stellar.org/docs/tools/cli) 23 or newer,
+  for building optimized wasm and deploying
+
+### Build and test
+
+```bash
+git clone https://github.com/StellarPOS-App/contracts.git
+cd contracts
+
+make test      # 63 tests across all crates
+make check     # rustfmt + clippy -D warnings + tests (what CI runs)
+make build     # optimized wasm in target/wasm32v1-none/release/
+make sizes     # wasm sizes, all well under the 64 KB limit
+make verify    # check a deployment runs exactly this source (NETWORK=testnet)
+```
+
+### Deploy to testnet
+
+```bash
+make deploy                      # NETWORK=testnet, FEE_BPS=100 by default
+NETWORK=testnet FEE_BPS=250 make deploy
+```
+
+[`scripts/deploy.sh`](scripts/deploy.sh) creates and funds a deployer
+identity if needed, deploys all five contracts, initializes them, connects
+the loyalty program to the processor, and writes every contract ID to
+`deployments/<network>.json`. See [docs/deployment.md](docs/deployment.md)
+for the post-deploy checklist (multisig rotation, merchant onboarding) and
+example `stellar contract invoke` calls.
+
+## Project layout
+
+```
+ main
+contracts/
+  shared/               fee math and TTL helpers (rlib)
+  merchant-registry/
+  payment-processor/
+  loyalty-program/
+  treasury/
+  escrow-service/
+    src/dispute.rs      dispute reasons, role rules, default rulings
+    tests/              end-to-end dispute scenarios
+ fix/issue-174-add-payment-authorization-delegation
+docs/                   architecture and deployment guides
+scripts/deploy.sh       deploy + initialize + wire
+deployments/            contract IDs per network (written by deploy.sh)
+```
+
+## Contributing
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md). In short: open an issue first for
+anything non-trivial, keep pull requests focused, and run `make check`
+before pushing. Security issues go through [SECURITY.md](SECURITY.md), never
+public issues.
+
+## License
+
+[MIT](LICENSE)
+
+ fix-issue-164
+<!-- fix: issue #164 - [Bug] Admin revocation does not clear pending admin actions -->
+
+## Payment Authorization Delegation\n\nMerchants should be able to delegate payment authorization to sub-accounts without sharing admin keys, requiring new delegate and revoke_delegate entry points in merchant-registry.
+
+docs/                   architecture, deployment and authorization audit
+examples/js/            JavaScript integration examples (checkout, verify, refund)
+scripts/deploy.sh       deploy + initialize + wire
+deployments/            contract IDs per network (written by deploy.sh)
+```
+
+## Contributing
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md). In short: open an issue first for
+anything non-trivial, keep pull requests focused, and run `make check`
+before pushing. Security issues go through [SECURITY.md](SECURITY.md), never
+public issues.
+
+## License
+
+[MIT](LICENSE)
+
+ fix/issue-165-add-payment-splitting
+ fix/issue-165-add-payment-splitting
+## Group Payment Splitting\n\nA pay_split entry point allowing multiple payers to contribute to a single order atomically, reverting fully if any sub-transfer fails.
+
+ fix/issue-173-fix-expired-ledger-entry-read
+## Expired Ledger Entry Handling\n\nReading a ledger entry past its TTL returns None from get(). The contract must handle this explicitly rather than unwrapping, or extend TTL proactively on every read of long-lived records.
+
+ fix/issue-172-add-slippage-protection
+## Slippage Protection\n\nCross-currency conversions must accept a min_amount_out parameter. Without it, a price oracle update between quote and settlement can result in fewer tokens than expected.
+
+ fix/issue-170-add-on-chain-terminal-registration
+## On-Chain Terminal Registration\n\nPOS terminals should be registered on-chain so the backend can verify a payment was initiated from an authorized device, preventing fraudulent payment injection.
+
+ fix/issue-169-fix-negative-fee-underflow
+## Negative Fee Guard\n\nFee values must be validated as non-negative before arithmetic. A negative fee passed through bps_of wraps on underflow, producing a vastly inflated net payment to the merchant.
+
+ fix/issue-168-fix-cross-contract-reentrancy
+## Reentrancy via Callback\n\nAny function invoking an external contract must complete all internal state writes before the cross-contract call. Soroban does not prevent reentrancy at the contract level.
+
+ fix/issue-167-add-coverage-reports-to-ci
+## CI Coverage Reports\n\nThe CI pipeline should generate lcov coverage reports as artifacts, with a gate failing the build if line coverage drops below 80%.
+
+ fix/issue-166-optimize-direct-payment-hot-path
+## Direct Payment Hot Path\n\nA dedicated pay_direct entry point for same-asset payments with no loyalty or escrow can skip registry lookups and fee splits, reducing ledger operations.
+ main
+
+ fix/issue-164-fix-admin-revocation-cleanup
+## Admin Revocation Cleanup\n\nRevoking an admin must cancel all pending multisig proposals requiring that admin's signature to prevent orphaned votes.
+
+ fix/issue-163-fix-payment-id-predictability
+## Payment ID Uniqueness\n\nPayment IDs from predictable inputs allow a griefing attacker to occupy an ID slot. Use a hash including an unpredictable caller-supplied nonce.
+
+ fix/issue-162-add-malicious-token-tests
+## Malicious Token Testing\n\nThe test suite must include a mock token returning false from transfer or reverting mid-transfer to test behaviour against non-standard SAC implementations.
+
+ fix/issue-161-add-compliance-report-hook
+## Compliance Report Hook\n\nAn optional on-chain hook address per merchant enables the processor to emit compliance events after each settlement without modifying core contract logic.
+
+ fix/issue-160-fix-merchant-payment-count-on-refund
+## Merchant Payment Count on Refund\n\nThe payment_count metric must be decremented or a refund_count incremented when a refund is processed to avoid inflating reported transaction volume.
+
+ fix-issue-165
 <!-- fix: issue #165 - [Enhancement] Add payment splitting for group purchases -->
+
+ fix/issue-158-add-pos-terms-glossary
+## POS Terms Glossary\n\nA glossary in docs/glossary.md (settlement, escrow, loyalty tier, BPS, SAC, order_ref) helps new contributors understand contract semantics without prior Stellar knowledge.
+
+## Configurable Royalty Split\n\nMarketplace integrations need a royalty split where a configurable percentage forwards to a creator address, stored per merchant and enforced atomically within the pay entry point.
+ main
+ main
+ main
+ main
+ main
+ main
+ main
+ fix/issue-165-add-payment-splitting
+
+ main
+ main
+ main
+ main
+ main
+ main
+ main
+ main
+ main
+ main

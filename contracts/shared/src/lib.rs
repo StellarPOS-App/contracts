@@ -1,313 +1,140 @@
-// Shared types for escrow service
-use soroban_sdk::{contracttype, Address, String, Vec, Env, Map, Symbol};
+//! Helpers shared by every StellarPOS contract.
+//!
+//! This crate is linked into each contract as a plain `rlib`; it does not
+//! deploy on its own. It holds the pieces that must behave identically across
+//! contracts: basis-point fee math and storage TTL management.
 
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum EscrowStatus {
-    Created,
-    Funded,
-    Active,
-    Disputed,
-    Resolved,
-    Released,
-    Cancelled,
-    Expired,
+#![no_std]
+
+use soroban_sdk::{Env, IntoVal, Val};
+
+/// 100% expressed in basis points.
+pub const BPS_DENOMINATOR: u32 = 10_000;
+
+/// Hard ceiling on any protocol fee: 10%.
+pub const MAX_FEE_BPS: u32 = 1_000;
+
+/// Ledgers close roughly every 5 seconds, so one day is ~17,280 ledgers.
+pub const DAY_IN_LEDGERS: u32 = 17_280;
+
+/// Instance storage (config, counters) is bumped to ~30 days whenever it
+/// drops below ~29 days.
+pub const INSTANCE_BUMP: u32 = 30 * DAY_IN_LEDGERS;
+pub const INSTANCE_THRESHOLD: u32 = INSTANCE_BUMP - DAY_IN_LEDGERS;
+
+/// Persistent records (payments, escrows, balances) live ~90 days between
+/// touches and are bumped back up whenever they are read or written.
+pub const PERSISTENT_BUMP: u32 = 90 * DAY_IN_LEDGERS;
+pub const PERSISTENT_THRESHOLD: u32 = PERSISTENT_BUMP - DAY_IN_LEDGERS;
+
+/// Returns `amount * bps / 10_000`, rounded half up and floored at 0.
+///
+/// Half-up rounding means a fractional fee is never silently dropped: a value
+/// with a fractional part of 0.5 or more is rounded away from zero, so the
+/// protocol is not shortchanged by truncation on every small payment.
+///
+/// Returns `None` on overflow or when `bps` exceeds 100%, so callers can map
+/// it to their own contract error instead of panicking. A negative `amount`
+/// would otherwise produce a negative fee, which callers deduct from the
+/// payout and so overpay the recipient; the result is therefore clamped to 0.
+pub fn bps_of(amount: i128, bps: u32) -> Option<i128> {
+    if bps > BPS_DENOMINATOR {
+        return None;
+    }
+    if amount <= 0 {
+        return Some(0);
+    }
+    let denominator = BPS_DENOMINATOR as i128;
+    let scaled = amount.checked_mul(bps as i128)?;
+    let mut value = scaled.checked_div(denominator)?;
+    if scaled.checked_rem(denominator)? >= denominator / 2 {
+        value = value.checked_add(1)?;
+    }
+    Some(value)
 }
 
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum DisputeStatus {
-    Open,
-    UnderReview,
-    Resolved,
-    Escalated,
-    Expired,
+/// Splits `amount` into `(fee, net)` where `fee = bps_of(amount, bps)`.
+pub fn split_fee(amount: i128, bps: u32) -> Option<(i128, i128)> {
+    let fee = bps_of(amount, bps)?;
+    Some((fee, amount.checked_sub(fee)?))
 }
 
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum DisputeResolution {
-    ReleaseToBuyer,
-    ReleaseToSeller,
-    Split { buyer_amount: i128, seller_amount: i128 },
-    Refund,
-    PartialRelease { buyer_amount: i128, seller_amount: i128 },
+/// Keeps the calling contract's instance storage alive.
+pub fn extend_instance(env: &Env) {
+    env.storage()
+        .instance()
+        .extend_ttl(INSTANCE_THRESHOLD, INSTANCE_BUMP);
 }
 
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum DisputeReason {
-    NonDelivery,
-    NotAsDescribed,
-    Defective,
-    WrongItem,
-    LateDelivery,
-    SellerNonResponsive,
-    BuyerNonResponsive,
-    PriceDispute,
-    QualityDispute,
-    Other(String),
+/// Keeps one persistent entry alive. Call after every read or write of a
+/// long-lived record so active data never gets archived.
+pub fn extend_persistent<K>(env: &Env, key: &K)
+where
+    K: IntoVal<Env, Val>,
+{
+    env.storage()
+        .persistent()
+        .extend_ttl(key, PERSISTENT_THRESHOLD, PERSISTENT_BUMP);
 }
 
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum AutomatedResolution {
-    AutoReleaseToBuyer,
-    AutoReleaseToSeller,
-    AutoSplit { buyer_percent: u32, seller_percent: u32 },
-    AutoRefund,
-    RequiresArbitration,
+/// Checks if a persistent storage entry has expired.
+/// Returns true if the entry exists and has not expired, false otherwise.
+pub fn is_entry_valid<K>(env: &Env, key: &K) -> bool
+where
+    K: IntoVal<Env, Val>,
+{
+    env.storage().persistent().has(key)
 }
 
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum PartyRole {
-    Buyer,
-    Seller,
-    Arbiter,
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Party {
-    pub address: Address,
-    pub role: PartyRole,
-}
+    #[test]
+    fn bps_rounds_half_up() {
+        assert_eq!(bps_of(1_000, 250), Some(25));
+        assert_eq!(bps_of(999, 1), Some(0));
+        assert_eq!(bps_of(0, 500), Some(0));
+        // Exactly half a unit rounds up, never down.
+        assert_eq!(bps_of(2, 2_500), Some(1));
+        assert_eq!(bps_of(1, 5_000), Some(1));
+        assert_eq!(bps_of(3, 5_000), Some(2));
+        // Just below half still rounds down.
+        assert_eq!(bps_of(1, 4_999), Some(0));
+        assert_eq!(bps_of(1, 5_001), Some(1));
+    }
 
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct EscrowTerms {
-    pub amount: i128,
-    pub asset: Address,
-    pub release_time: u64,
-    pub auto_release: bool,
-    pub dispute_period: u64,
-    pub arbitration_timeout: u64,
-    pub partial_release_allowed: bool,
-    pub min_partial_amount: i128,
-    pub arbiter: Option<Address>,
-    pub auto_resolution_rules: Vec<AutoResolutionRule>,
-}
+    #[test]
+    fn bps_rejects_more_than_one_hundred_percent() {
+        assert_eq!(bps_of(100, 10_001), None);
+        assert_eq!(bps_of(100, 10_000), Some(100));
+    }
 
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct AutoResolutionRule {
-    pub trigger: DisputeReason,
-    pub resolution: AutomatedResolution,
-    pub time_limit: u64,
-}
+    #[test]
+    fn bps_reports_overflow_instead_of_panicking() {
+        assert_eq!(bps_of(i128::MAX, 2), None);
+    }
 
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct AutomatedResolution {
-    pub action: AutomatedResolutionAction,
-    pub buyer_amount: Option<i128>,
-    pub seller_amount: Option<i128>,
-}
+    #[test]
+    fn split_fee_conserves_the_total() {
+        let (fee, net) = split_fee(12_345_678, 275).unwrap();
+        assert_eq!(fee + net, 12_345_678);
+        assert_eq!(fee, 339_506);
+    }
 
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum AutomatedResolutionAction {
-    ReleaseToBuyer,
-    ReleaseToSeller,
-    Split,
-    Refund,
-    EscalateToArbiter,
-}
+    #[test]
+    fn bps_never_returns_a_negative_fee() {
+        // -1_000 * 250 / 10_000 would divide to -25 without the floor.
+        assert_eq!(bps_of(-1_000, 250), Some(0));
+        assert_eq!(bps_of(-1, 10_000), Some(0));
+        // Small positive amounts that round to zero stay at zero too.
+        assert_eq!(bps_of(1, 500), Some(0));
+    }
 
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Escrow {
-    pub id: u64,
-    pub buyer: Address,
-    pub seller: Address,
-    pub arbiter: Option<Address>,
-    pub terms: EscrowTerms,
-    pub status: EscrowStatus,
-    pub funded_amount: i128,
-    pub released_amount: i128,
-    pub dispute: Option<Dispute>,
-    pub created_at: u64,
-    pub updated_at: u64,
-    pub released_at: Option<u64>,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Dispute {
-    pub id: u64,
-    pub escrow_id: u64,
-    pub raised_by: Address,
-    pub reason: DisputeReason,
-    pub description: String,
-    pub status: DisputeStatus,
-    pub resolution: Option<DisputeResolution>,
-    pub auto_resolution: Option<AutomatedResolution>,
-    pub raised_at: u64,
-    pub resolved_at: Option<u64>,
-    pub resolution_deadline: u64,
-    pub arbiter_assigned: Option<Address>,
-    pub evidence: Map<Address, Vec<Evidence>>,
-    pub auto_resolution_deadline: u64,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Evidence {
-    pub submitted_by: Address,
-    pub description: String,
-    pub data: Vec<u8>,
-    pub submitted_at: u64,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct TimeLock {
-    pub escrow_id: u64,
-    pub release_time: u64,
-    pub amount: i128,
-    pub released: bool,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct PartialRelease {
-    pub escrow_id: u64,
-    pub amount: i128,
-    pub recipient: Address,
-    pub reason: String,
-    pub approved_by: Address,
-    pub released_at: u64,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct EmergencyRecovery {
-    pub escrow_id: u64,
-    pub requested_by: Address,
-    pub reason: String,
-    pub approved: bool,
-    pub executed_at: Option<u64>,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct EscrowCreated {
-    pub escrow_id: u64,
-    pub buyer: Address,
-    pub seller: Address,
-    pub amount: i128,
-    pub asset: Address,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct FundsDeposited {
-    pub escrow_id: u64,
-    pub amount: i128,
-    pub depositor: Address,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct FundsReleased {
-    pub escrow_id: u64,
-    pub amount: i128,
-    pub recipient: Address,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct DisputeRaised {
-    pub dispute_id: u64,
-    pub escrow_id: u64,
-    pub raised_by: Address,
-    pub reason: DisputeReason,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct DisputeResolved {
-    pub dispute_id: u64,
-    pub resolution: DisputeResolution,
-    pub resolved_by: Address,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct AutoResolutionExecuted {
-    pub dispute_id: u64,
-    pub resolution: AutomatedResolution,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct PartialReleaseEvent {
-    pub escrow_id: u64,
-    pub amount: i128,
-    pub recipient: Address,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct EmergencyRecoveryEvent {
-    pub escrow_id: u64,
-    pub requested_by: Address,
-    pub amount: i128,
-}
-
-#[contracttype]
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum Error {
-    AlreadyInitialized,
-    NotInitialized,
-    Unauthorized,
-    EscrowNotFound,
-    EscrowNotFunded,
-    EscrowAlreadyFunded,
-    InvalidAmount,
-    InsufficientFunds,
-    InvalidStatus,
-    DisputeNotFound,
-    DisputeAlreadyExists,
-    DisputeNotOpen,
-    DisputeExpired,
-    InvalidDisputeReason,
-    InvalidResolution,
-    UnauthorizedResolution,
-    TimeLockNotExpired,
-    TimeLockExpired,
-    InvalidPartialAmount,
-    PartialReleaseNotAllowed,
-    EmergencyRecoveryNotAllowed,
-    EmergencyRecoveryAlreadyRequested,
-    ArbiterNotSet,
-    ArbiterAlreadyAssigned,
-    InvalidArbiter,
-    EvidenceNotFound,
-    InvalidEvidence,
-    AutoResolutionNotConfigured,
-    AutoResolutionTimeout,
-    ArbitrationTimeout,
-    InvalidTimeLock,
-    AlreadyReleased,
-    AlreadyCancelled,
-    Expired,
-}
-
-impl From<Error> for soroban_sdk::Error {
-    fn from(e: Error) -> Self {
-        soroban_sdk::Error::from_contract_error(e as u32)
+    #[test]
+    fn split_fee_does_not_add_a_negative_fee_to_the_payout() {
+        let (fee, net) = split_fee(-1_000, 250).unwrap();
+        assert_eq!(fee, 0);
+        assert_eq!(net, -1_000);
     }
 }
-
-pub const ESCROW_COUNTER: Symbol = symbol_short!("ESCROW_CNT");
-pub const DISPUTE_COUNTER: Symbol = symbol_short!("DISP_CNT");
-pub const ESCROW_PREFIX: Symbol = symbol_short!("ESCROW");
-pub const DISPUTE_PREFIX: Symbol = symbol_short!("DISP");
-pub const TIMELOCK_PREFIX: Symbol = symbol_short!("TL");
-pub const PARTIAL_PREFIX: Symbol = symbol_short!("PART");
-pub const EMERGENCY_PREFIX: Symbol = symbol_short!("EMERG");
-pub const EVIDENCE_PREFIX: Symbol = symbol_short!("EVID");
-pub const ADMIN: Symbol = symbol_short!("ADMIN");
-pub const PAUSED: Symbol = symbol_short!("PAUSED");

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/StellarPOS-App/contracts/security/advisories/new
+    about: Report vulnerabilities privately. Do not open a public issue.
+  - name: Stellar developer docs
+    url: https://developers.stellar.org/
+    about: Questions about Stellar or Soroban itself.

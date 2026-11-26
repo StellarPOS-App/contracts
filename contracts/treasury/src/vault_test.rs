@@ -4,7 +4,7 @@ extern crate std;
 use super::*;
 use soroban_sdk::{
     contract, contractimpl, contracttype,
-    testutils::Address as _,
+    testutils::{Address as _, Ledger as _},
     token::{self, StellarAssetClient},
     vec, Address, Env, String,
 };
@@ -150,6 +150,11 @@ fn pass(w: &World, action: Action) -> Result<(), Result<TreasuryError, soroban_s
     let id =
         w.t.propose(&w.a, &action, &String::from_str(&w.env, "yield"));
     w.t.approve(&w.b, &id);
+    if matches!(action, Action::VaultDeposit(..)) {
+        w.env
+            .ledger()
+            .set_timestamp(w.env.ledger().timestamp() + FUND_MOVEMENT_TIMELOCK_SECS);
+    }
     w.t.try_execute(&id).map(|_| ())
 }
 

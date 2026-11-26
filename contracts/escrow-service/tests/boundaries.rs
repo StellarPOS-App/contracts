@@ -121,6 +121,7 @@ fn ruling_is_allowed_up_to_the_deadline_and_default_waits_for_it() {
         &1_000,
         &(START + 3 * DAY),
         &(2 * DAY),
+        &(START + 33 * DAY), // expires_at: 30 days after release_at
     );
     w.escrow
         .raise_dispute(&w.buyer, &id, &DisputeReason::Defective, &None);

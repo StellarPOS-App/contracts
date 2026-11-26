@@ -468,7 +468,9 @@ impl Treasury {
 
     fn executable_at_of(proposal: &Proposal) -> u64 {
         if Self::moves_funds(&proposal.action) {
-            proposal.created_at.saturating_add(FUND_MOVEMENT_TIMELOCK_SECS)
+            proposal
+                .created_at
+                .saturating_add(FUND_MOVEMENT_TIMELOCK_SECS)
         } else {
             proposal.created_at
         }

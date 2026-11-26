@@ -49,9 +49,7 @@ fn memo(env: &Env) -> String {
 
 /// Moves the ledger past the timelock on a proposal created at genesis.
 fn mature_funds(s: &Setup) {
-    s.env
-        .ledger()
-        .set_timestamp(FUND_MOVEMENT_TIMELOCK_SECS);
+    s.env.ledger().set_timestamp(FUND_MOVEMENT_TIMELOCK_SECS);
 }
 
 #[test]
@@ -291,10 +289,7 @@ fn fund_movements_wait_for_the_timelock() {
     );
     s.t.approve(&s.b, &id);
 
-    assert_eq!(
-        s.t.executable_at(&id),
-        FUND_MOVEMENT_TIMELOCK_SECS
-    );
+    assert_eq!(s.t.executable_at(&id), FUND_MOVEMENT_TIMELOCK_SECS);
     assert_eq!(
         s.t.try_execute(&id),
         Err(Ok(TreasuryError::TimelockNotElapsed))
@@ -310,9 +305,7 @@ fn fund_movements_wait_for_the_timelock() {
         Err(Ok(TreasuryError::TimelockNotElapsed))
     );
 
-    s.env
-        .ledger()
-        .set_timestamp(FUND_MOVEMENT_TIMELOCK_SECS);
+    s.env.ledger().set_timestamp(FUND_MOVEMENT_TIMELOCK_SECS);
     s.t.execute(&id);
     assert_eq!(s.t.balance(&s.asset), 900);
     assert_eq!(token::Client::new(&s.env, &s.asset).balance(&to), 100);

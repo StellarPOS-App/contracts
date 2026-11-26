@@ -70,6 +70,7 @@ pub enum EscrowError {
     DeadlinePassed = 16,
     InvalidSplit = 17,
     Overflow = 18,
+    EscrowExpired = 19,
     UnsupportedSchemaVersion = 19,
 }
 
@@ -124,6 +125,8 @@ pub struct Escrow {
     pub arbitration_window: u64,
     pub status: EscrowStatus,
     pub created_at: u64,
+    /// Maximum time by which the escrow must be claimed, after this it expires.
+    pub expires_at: u64,
 }
 
 impl Escrow {
@@ -317,6 +320,7 @@ impl EscrowService {
         amount: i128,
         release_at: u64,
         arbitration_window: u64,
+        expires_at: u64,
     ) -> Result<u64, EscrowError> {
         Self::require_not_paused(&env)?;
         buyer.require_auth();
@@ -328,6 +332,10 @@ impl EscrowService {
             return Err(EscrowError::InvalidParties);
         }
         let now = env.ledger().timestamp();
+        if release_at <= now
+            || expires_at <= release_at
+            || !(MIN_ARBITRATION_WINDOW..=MAX_ARBITRATION_WINDOW).contains(&arbitration_window)
+        {
         let arbitration_window = if arbitration_window == 0 {
             Self::resolve_arbitration_window(&env, &seller)
         } else {
@@ -353,6 +361,7 @@ impl EscrowService {
             arbitration_window,
             status: EscrowStatus::Funded,
             created_at: now,
+            expires_at,
         };
         Self::save(&env, &escrow);
         Self::track_merchant_escrow(&env, &seller, id);
@@ -382,6 +391,7 @@ impl EscrowService {
         amount: i128,
         release_at: u64,
         arbitration_window: u64,
+        expires_at: u64,
     ) -> Result<u64, EscrowError> {
         seller.require_auth();
         let premium = amount
@@ -401,6 +411,7 @@ impl EscrowService {
             amount,
             release_at,
             arbitration_window,
+            expires_at,
         )?;
         token::Client::new(&env, &asset).transfer(&buyer, env.current_contract_address(), &premium);
         env.storage().persistent().set(&DataKey::Insured(id), &true);
@@ -456,6 +467,8 @@ impl EscrowService {
         Self::require_not_paused(&env)?;
         let mut escrow = Self::funded(&env, id)?;
         escrow.seller.require_auth();
+        let now = env.ledger().timestamp();
+        if now < escrow.release_at {
         // The escrow remains live through the exact release ledger close.
         // A claim is due only strictly after `release_at`, so a transaction at
         // the boundary is not incorrectly treated as expired (#119).
@@ -465,6 +478,9 @@ impl EscrowService {
             .ok_or(EscrowError::Overflow)?;
         if env.ledger().timestamp() <= claim_after {
             return Err(EscrowError::ReleaseNotDue);
+        }
+        if now > escrow.expires_at {
+            return Err(EscrowError::EscrowExpired);
         }
         let amount = escrow.remaining();
         Self::payout(&env, &mut escrow, amount, 0, EscrowStatus::Released);

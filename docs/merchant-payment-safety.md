@@ -1,0 +1,1 @@
+# Merchant payment safety`n`nMerchant operations require a blacklist gate before payment creation, immutable fee snapshots for escrowed payments, targeted state updates, and published deployment-address records.

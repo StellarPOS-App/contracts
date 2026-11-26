@@ -12,8 +12,14 @@
 
 use shared::{extend_instance, extend_persistent};
 use soroban_sdk::{
-    contract, contracterror, contractevent, contractimpl, contracttype, Address, Env, String, Vec,
+    contract, contractclient, contracterror, contractevent, contractimpl, contracttype, Address,
+    Env, String, Vec,
 };
+
+#[contractclient(name = "EscrowClient")]
+pub trait EscrowInterface {
+    fn cancel_for_merchant(env: Env, merchant: Address) -> u32;
+}
 
 /// Maximum number of assets a merchant can accept. Keeps `accepts` cheap.
 pub const MAX_ACCEPTED_ASSETS: u32 = 10;
@@ -43,6 +49,7 @@ pub enum MerchantStatus {
     Pending,
     Active,
     Suspended,
+    Deregistered,
 }
 
 #[contracttype]
@@ -67,6 +74,7 @@ enum DataKey {
     Paused,
     MerchantCount,
     Merchant(Address),
+    EscrowService,
 }
 
 #[contractevent]
@@ -107,6 +115,13 @@ pub struct MerchantUpdated {
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MerchantRejected {
+    #[topic]
+    pub owner: Address,
+}
+
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MerchantDeregistered {
     #[topic]
     pub owner: Address,
 }
@@ -323,6 +338,40 @@ impl MerchantRegistry {
         )
     }
 
+    /// Permanently removes a merchant from checkout and asks the configured
+    /// escrow service to return every still-active escrow to its buyer.
+    pub fn deregister(env: Env, owner: Address) -> Result<(), RegistryError> {
+        Self::admin(&env)?.require_auth();
+        let merchant = Self::load(&env, &owner)?;
+        if !matches!(
+            merchant.status,
+            MerchantStatus::Active | MerchantStatus::Suspended
+        ) {
+            return Err(RegistryError::InvalidStatusTransition);
+        }
+        Self::apply_status_unchecked(&env, owner.clone(), MerchantStatus::Deregistered)?;
+        if let Some(escrow) = env.storage().instance().get(&DataKey::EscrowService) {
+            EscrowClient::new(&env, &escrow).cancel_for_merchant(&owner);
+        }
+        MerchantDeregistered { owner }.publish(&env);
+        Ok(())
+    }
+
+    /// Links the escrow service used by `deregister`. It is intentionally an
+    /// explicit deployment step so existing deployments remain compatible.
+    pub fn set_escrow_service(env: Env, escrow: Option<Address>) -> Result<(), RegistryError> {
+        Self::admin(&env)?.require_auth();
+        match escrow {
+            Some(address) => env
+                .storage()
+                .instance()
+                .set(&DataKey::EscrowService, &address),
+            None => env.storage().instance().remove(&DataKey::EscrowService),
+        }
+        extend_instance(&env);
+        Ok(())
+    }
+
     pub fn pause(env: Env) -> Result<(), RegistryError> {
         Self::set_paused(&env, true)
     }
@@ -455,19 +504,16 @@ impl MerchantRegistry {
         Ok(())
     }
 
-    fn apply_status_silent(
+    fn apply_status_unchecked(
         env: &Env,
         owner: Address,
-        from: MerchantStatus,
         to: MerchantStatus,
     ) -> Result<(), RegistryError> {
         let mut merchant = Self::load(env, &owner)?;
-        if merchant.status != from {
-            return Err(RegistryError::InvalidStatusTransition);
-        }
         merchant.status = to;
         merchant.updated_at = env.ledger().timestamp();
         Self::save(env, &merchant);
+        MerchantStatusChanged { owner, status: to }.publish(env);
         Ok(())
     }
 

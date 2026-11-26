@@ -204,8 +204,7 @@
           "sub_invocations": []
         }
       ]
-    ],
-    []
+    ]
   ],
   "ledger": {
     "protocol_version": 27,
@@ -540,6 +539,30 @@
               "key": {
                 "vec": [
                   {
+                    "symbol": "EventIndex"
+                  }
+                ]
+              },
+              "durability": "persistent",
+              "val": {
+                "u64": "1"
+              }
+            }
+          },
+          "ext": "v0"
+        },
+        "live_until": 1555200
+      },
+      {
+        "entry": {
+          "last_modified_ledger_seq": 0,
+          "data": {
+            "contract_data": {
+              "ext": "v0",
+              "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARQG5",
+              "key": {
+                "vec": [
+                  {
                     "symbol": "Proposal"
                   },
                   {
@@ -644,12 +667,6 @@
                           },
                           {
                             "key": {
-                              "symbol": "loyalty"
-                            },
-                            "val": "void"
-                          },
-                          {
-                            "key": {
                               "symbol": "paused"
                             },
                             "val": {
@@ -706,6 +723,18 @@
                             }
                           }
                         ]
+                      }
+                    },
+                    {
+                      "key": {
+                        "vec": [
+                          {
+                            "symbol": "NextPaymentId"
+                          }
+                        ]
+                      },
+                      "val": {
+                        "u64": "0"
                       }
                     },
                     {
@@ -932,5 +961,145 @@
       }
     ]
   },
-  "events": []
+  "events": [
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARQG5",
+        "type_": "contract",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "param_change_proposed"
+              },
+              {
+                "u64": "1"
+              }
+            ],
+            "data": {
+              "map": [
+                {
+                  "key": {
+                    "symbol": "change"
+                  },
+                  "val": {
+                    "vec": [
+                      {
+                        "symbol": "Treasury"
+                      },
+                      {
+                        "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "proposer"
+                  },
+                  "val": {
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARQG5",
+        "type_": "contract",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "config_updated"
+              }
+            ],
+            "data": {
+              "map": [
+                {
+                  "key": {
+                    "symbol": "event_index"
+                  },
+                  "val": {
+                    "u64": "1"
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "fee_bps"
+                  },
+                  "val": {
+                    "u32": 250
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "paused"
+                  },
+                  "val": {
+                    "bool": false
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "treasury"
+                  },
+                  "val": {
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARQG5",
+        "type_": "contract",
+        "body": {
+          "v0": {
+            "topics": [
+              {
+                "symbol": "param_change_applied"
+              },
+              {
+                "u64": "1"
+              }
+            ],
+            "data": {
+              "map": [
+                {
+                  "key": {
+                    "symbol": "change"
+                  },
+                  "val": {
+                    "vec": [
+                      {
+                        "symbol": "Treasury"
+                      },
+                      {
+                        "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "failed_call": false
+    }
+  ]
 }

@@ -87,7 +87,12 @@ fn insured_escrow_funds_pool_and_covers_small_dispute_refund() {
     assert_eq!(s.token.balance(&s.client.address), 1_010);
     s.client
         .raise_dispute(&s.buyer, &id, &DisputeReason::NonDelivery, &None);
-    s.env.ledger().with_mut(|l| l.timestamp = now + 3 * DAY);
+    s.env.ledger().with_mut(|l| {
+        l.timestamp = now + 3 * DAY;
+        l.sequence_number = l
+            .sequence_number
+            .saturating_add((3 * DAY / LEDGER_CLOSE_SECONDS) as u32);
+    });
     s.client.resolve_by_default(&id);
 
     assert_eq!(s.token.balance(&s.buyer), 9_990);
@@ -124,6 +129,7 @@ fn gas_benchmarks_create_escrow_within_thresholds() {
 fn buyer_release_pays_seller() {
     let s = setup();
     let id = open(&s, 1_000);
+    s.env.ledger().with_mut(|l| l.timestamp += MIN_ESCROW_LOCK_PERIOD);
     s.client.release(&id);
     assert_eq!(s.token.balance(&s.seller), 1_000);
     assert_eq!(s.client.get_escrow(&id).status, EscrowStatus::Released);
@@ -137,6 +143,7 @@ fn buyer_release_pays_seller() {
 fn partial_releases_add_up() {
     let s = setup();
     let id = open(&s, 1_000);
+    s.env.ledger().with_mut(|l| l.timestamp += MIN_ESCROW_LOCK_PERIOD);
     assert_eq!(s.client.release_partial(&id, &300), 700);
     assert_eq!(s.client.release_partial(&id, &700), 0);
     assert_eq!(s.token.balance(&s.seller), 1_000);
@@ -147,6 +154,7 @@ fn partial_releases_add_up() {
 fn partial_release_cannot_exceed_remaining() {
     let s = setup();
     let id = open(&s, 1_000);
+    s.env.ledger().with_mut(|l| l.timestamp += MIN_ESCROW_LOCK_PERIOD);
     s.client.release_partial(&id, &600);
     assert_eq!(
         s.client.try_release_partial(&id, &401),
@@ -159,7 +167,9 @@ fn seller_claims_only_after_release_time() {
     let s = setup();
     let id = open(&s, 1_000);
     assert_eq!(s.client.try_claim(&id), Err(Ok(EscrowError::ReleaseNotDue)));
-    s.env.ledger().with_mut(|l| l.timestamp += 3 * DAY);
+    s.env
+        .ledger()
+        .with_mut(|l| l.timestamp += 3 * DAY + SETTLEMENT_GRACE_PERIOD + 1);
     s.client.claim(&id);
     assert_eq!(s.token.balance(&s.seller), 1_000);
 }
@@ -168,6 +178,7 @@ fn seller_claims_only_after_release_time() {
 fn seller_refund_returns_remainder_even_while_paused() {
     let s = setup();
     let id = open(&s, 1_000);
+    s.env.ledger().with_mut(|l| l.timestamp += MIN_ESCROW_LOCK_PERIOD);
     s.client.release_partial(&id, &250);
     s.client.pause();
     s.client.refund(&id);
@@ -282,4 +293,57 @@ fn pay_direct_validates_inputs_and_respects_pause() {
         s.client.try_pay_direct(&s.buyer, &s.seller, &s.asset, &100),
         Err(Ok(EscrowError::Paused))
     );
+}
+
+
+#[test]
+fn lock_has_a_floor_and_is_snapshotted_at_funding() {
+    let s = setup();
+    let c = &s.client;
+    assert_eq!(c.min_lock_period(), MIN_ESCROW_LOCK_PERIOD);
+    assert_eq!(
+        c.try_set_min_lock_period(&(MIN_ESCROW_LOCK_PERIOD - 1)),
+        Err(Ok(EscrowError::InvalidSchedule))
+    );
+
+    let lock = MIN_ESCROW_LOCK_PERIOD * 2;
+    c.set_min_lock_period(&lock);
+    let now = s.env.ledger().timestamp();
+    assert_eq!(
+        c.try_create(
+            &s.buyer, &s.seller, &s.arbiter, &s.asset, &1_000,
+            &(now + lock - 1), &DAY
+        ),
+        Err(Ok(EscrowError::InvalidSchedule))
+    );
+
+    let id = c.create(
+        &s.buyer, &s.seller, &s.arbiter, &s.asset, &1_000,
+        &(now + lock), &DAY,
+    );
+    c.set_min_lock_period(&MIN_ESCROW_LOCK_PERIOD);
+    s.env.ledger().with_mut(|l| l.timestamp += lock - 1);
+    assert_eq!(c.try_claim(&id), Err(Ok(EscrowError::ReleaseNotDue)));
+    assert_eq!(c.try_release(&id), Err(Ok(EscrowError::ReleaseNotDue)));
+    s.env.ledger().with_mut(|l| l.timestamp += 1 + SETTLEMENT_GRACE_PERIOD);
+    c.claim(&id);
+}
+
+#[test]
+fn each_escrow_pays_out_its_original_funding_asset() {
+    let s = setup();
+    let first = open(&s, 1_000);
+    let second_asset = s.env.register_stellar_asset_contract_v2(Address::generate(&s.env)).address();
+    StellarAssetClient::new(&s.env, &second_asset).mint(&s.buyer, &2_000);
+    let now = s.env.ledger().timestamp();
+    let second = s.client.create(
+        &s.buyer, &s.seller, &s.arbiter, &second_asset, &2_000,
+        &(now + DAY), &DAY,
+    );
+    s.env.ledger().with_mut(|l| l.timestamp += MIN_ESCROW_LOCK_PERIOD);
+    s.client.release(&first);
+    let second_token = token::Client::new(&s.env, &second_asset);
+    assert_eq!(s.token.balance(&s.seller), 1_000);
+    assert_eq!(second_token.balance(&s.seller), 0);
+    s.client.refund(&second);
 }

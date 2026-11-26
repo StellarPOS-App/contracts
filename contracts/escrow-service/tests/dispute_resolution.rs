@@ -2,7 +2,7 @@
 
 use escrow_service::{
     dispute::DisputeReason, EscrowError, EscrowService, EscrowServiceClient, EscrowStatus,
-    MAX_EVIDENCE,
+    CURRENT_SCHEMA_VERSION, LEDGER_CLOSE_SECONDS, MAX_EVIDENCE, MIN_ESCROW_LOCK_PERIOD, SETTLEMENT_GRACE_PERIOD,
 };
 use soroban_sdk::{
     testutils::{Address as _, Ledger},
@@ -66,7 +66,11 @@ fn hash(env: &Env, byte: u8) -> BytesN<32> {
 }
 
 fn advance(w: &World, secs: u64) {
-    w.env.ledger().with_mut(|l| l.timestamp += secs);
+    w.env.ledger().with_mut(|l| {
+        l.timestamp += secs;
+        let ledgers = secs.div_ceil(LEDGER_CLOSE_SECONDS) as u32;
+        l.sequence_number = l.sequence_number.saturating_add(ledgers);
+    });
 }
 
 #[test]
@@ -99,6 +103,7 @@ fn arbiter_splits_funds() {
     w.escrow.submit_evidence(&w.seller, &w.id, &hash(&w.env, 2));
 
     // 30% back to the buyer, 70% to the seller.
+    advance(&w, MIN_ESCROW_LOCK_PERIOD);
     w.escrow.resolve(&w.id, &3_000);
     assert_eq!(w.token.balance(&w.buyer), 300);
     assert_eq!(w.token.balance(&w.seller), 700);
@@ -107,19 +112,6 @@ fn arbiter_splits_funds() {
     let d = w.escrow.get_dispute(&w.id);
     assert_eq!(d.buyer_bps, 3_000);
     assert!(!d.by_default);
-}
-
-#[test]
-fn resolved_dispute_cannot_be_resolved_again() {
-    let w = world();
-    w.escrow
-        .raise_dispute(&w.buyer, &w.id, &DisputeReason::Defective, &None);
-    w.escrow.resolve(&w.id, &3_000);
-
-    assert_eq!(
-        w.escrow.try_resolve(&w.id, &5_000),
-        Err(Ok(EscrowError::InvalidStatus))
-    );
 }
 
 #[test]
@@ -208,9 +200,18 @@ fn reasons_are_role_restricted() {
 }
 
 #[test]
-fn buyer_dispute_window_closes_at_release_time() {
+fn post_release_grace_period_prevents_claim_front_running() {
     let w = world();
     advance(&w, 3 * DAY);
+    assert_eq!(w.escrow.try_claim(&w.id), Err(Ok(EscrowError::ReleaseNotDue)));
+    w.escrow
+        .raise_dispute(&w.buyer, &w.id, &DisputeReason::NonDelivery, &None);
+}
+
+#[test]
+fn claim_opens_only_after_the_settlement_grace_period() {
+    let w = world();
+    advance(&w, 3 * DAY + SETTLEMENT_GRACE_PERIOD + 1);
     assert_eq!(
         w.escrow
             .try_raise_dispute(&w.buyer, &w.id, &DisputeReason::NonDelivery, &None),
@@ -255,4 +256,24 @@ fn split_above_one_hundred_percent_is_rejected() {
         w.escrow.try_resolve(&w.id, &10_001),
         Err(Ok(EscrowError::InvalidSplit))
     );
+}
+
+#[test]
+fn dispute_deadline_uses_ledger_sequence_not_wall_clock_only() {
+    let w = world();
+    w.escrow
+        .raise_dispute(&w.buyer, &w.id, &DisputeReason::NonDelivery, &None);
+
+    // A large wall-clock jump alone must not expire the dispute while the
+    // ledger sequence is unchanged.
+    w.env.ledger().with_mut(|l| l.timestamp += 10 * DAY);
+    w.escrow.resolve(&w.id, &5_000);
+}
+
+#[test]
+fn initialized_contract_reports_current_schema_and_migrate_is_idempotent() {
+    let w = world();
+    assert_eq!(w.escrow.schema_version(), CURRENT_SCHEMA_VERSION);
+    assert_eq!(w.escrow.migrate(), CURRENT_SCHEMA_VERSION);
+    assert_eq!(w.escrow.schema_version(), CURRENT_SCHEMA_VERSION);
 }

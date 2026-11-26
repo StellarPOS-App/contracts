@@ -215,3 +215,8 @@ For large-scale migrations, consider:
 - [Architecture Overview](./architecture.md) - Contract design and dependencies
 - [Deployment Guide](./deployment.md) - Initial contract deployment
 - [Shared Library](../contracts/shared/src/lib.rs) - TTL management utilities (`extend_persistent`, `extend_instance`)
+
+
+## In-place escrow upgrades and schema migration
+
+The escrow service exposes `migrate()` and `upgrade(wasm_hash)`. The upgrade entry point is admin-authenticated and always runs the storage migration hook before calling Soroban's `update_current_contract_wasm`, so a wasm replacement cannot bypass the migration step. `schema_version()` exposes the on-chain version for deployment verification. Future storage-layout changes should extend `migrate_storage` with the next append-only schema transition before raising `CURRENT_SCHEMA_VERSION`.

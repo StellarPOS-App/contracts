@@ -122,13 +122,20 @@ All settlement happens atomically in a single transaction—either the entire pa
 | Crate | Purpose | Key entry points |
 |---|---|---|
 | [`merchant-registry`](contracts/merchant-registry/src/lib.rs) | Who may get paid, where funds settle, which assets each merchant takes | `register`, `approve`, `suspend`, `accepts`, `settlement_of` |
+ fix/issue-165-add-payment-splitting
+ fix/issue-165-add-payment-splitting
+
  fix/issue-170-add-on-chain-terminal-registration
 | [`payment-processor`](contracts/payment-processor/src/lib.rs) | Atomic sale settlement: fee to treasury, net to merchant, one payment per order | `pay`, `pay_batch`, `refund`, `payment_for_order`, `quote` |
 
  fix/issue-169-fix-negative-fee-underflow
+ main
 | [`payment-processor`](contracts/payment-processor/src/lib.rs) | Atomic sale settlement: fee to treasury, net to merchant, one payment per order | `pay`, `pay_batch`, `refund`, `payment_for_order`, `quote` |
 
 | [`payment-processor`](contracts/payment-processor/src/lib.rs) | Atomic sale settlement: fee to treasury, net to merchant, one payment per order | `pay`, `pay_batch`, `pay_with_royalties`, `refund`, `payment_for_order`, `quote`, `propose_param_change` |
+ main
+ fix/issue-165-add-payment-splitting
+
  main
  main
 | [`loyalty-program`](contracts/loyalty-program/src/lib.rs) | Per-merchant points with automatic Bronze/Silver/Gold/Platinum tiers | `enroll`, `accrue`, `redeem`, `get_account` |
@@ -333,6 +340,10 @@ public issues.
 
 [MIT](LICENSE)
 
+ fix/issue-165-add-payment-splitting
+ fix/issue-165-add-payment-splitting
+## Group Payment Splitting\n\nA pay_split entry point allowing multiple payers to contribute to a single order atomically, reverting fully if any sub-transfer fails.
+
  fix/issue-173-fix-expired-ledger-entry-read
 ## Expired Ledger Entry Handling\n\nReading a ledger entry past its TTL returns None from get(). The contract must handle this explicitly rather than unwrapping, or extend TTL proactively on every read of long-lived records.
 
@@ -353,6 +364,7 @@ public issues.
 
  fix/issue-166-optimize-direct-payment-hot-path
 ## Direct Payment Hot Path\n\nA dedicated pay_direct entry point for same-asset payments with no loyalty or escrow can skip registry lookups and fee splits, reducing ledger operations.
+ main
 
  fix/issue-164-fix-admin-revocation-cleanup
 ## Admin Revocation Cleanup\n\nRevoking an admin must cancel all pending multisig proposals requiring that admin's signature to prevent orphaned votes.
@@ -379,6 +391,9 @@ public issues.
  main
  main
  main
+ main
+ fix/issue-165-add-payment-splitting
+
  main
  main
  main

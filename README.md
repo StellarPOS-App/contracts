@@ -516,6 +516,9 @@ public issues.
  fix/issue-160-fix-merchant-payment-count-on-refund
 ## Merchant Payment Count on Refund\n\nThe payment_count metric must be decremented or a refund_count incremented when a refund is processed to avoid inflating reported transaction volume.
 
+ fix-issue-165
+<!-- fix: issue #165 - [Enhancement] Add payment splitting for group purchases -->
+
  fix/issue-158-add-pos-terms-glossary
 ## POS Terms Glossary\n\nA glossary in docs/glossary.md (settlement, escrow, loyalty tier, BPS, SAC, order_ref) helps new contributors understand contract semantics without prior Stellar knowledge.
 
@@ -529,6 +532,7 @@ public issues.
  main
  fix/issue-165-add-payment-splitting
 
+ main
  main
  main
  main

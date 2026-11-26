@@ -325,4 +325,8 @@ public issues.
 
 [MIT](LICENSE)
 
+ fix/issue-158-add-pos-terms-glossary
+## POS Terms Glossary\n\nA glossary in docs/glossary.md (settlement, escrow, loyalty tier, BPS, SAC, order_ref) helps new contributors understand contract semantics without prior Stellar knowledge.
+
 ## Configurable Royalty Split\n\nMarketplace integrations need a royalty split where a configurable percentage forwards to a creator address, stored per merchant and enforced atomically within the pay entry point.
+ main

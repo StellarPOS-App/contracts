@@ -28,6 +28,57 @@ This repository is one of three:
 | [`payment-stream`](contracts/payment-stream/src/lib.rs) | Per-second payment streams for subscriptions, rent and payroll; cancel splits earned and unearned exactly | `create`, `withdraw`, `cancel`, `available` |
 | [`shared`](contracts/shared/src/lib.rs) | Library, not deployed: basis-point fee math and storage TTL helpers | `bps_of`, `split_fee`, `extend_*` |
 
+## Contract Architecture
+
+The following diagram shows how the contracts interact with each other and the core entities:
+
+```
+                                    ┌─────────────────┐
+                                    │   Customer      │
+                                    │   Wallet        │
+                                    └────────┬────────┘
+                                             │
+                    ┌────────────────────────┼────────────────────────┐
+                    │                        │                        │
+                    ▼                        ▼                        ▼
+         ┌──────────────────┐    ┌──────────────────┐    ┌──────────────────┐
+         │  payment-        │    │  escrow-         │    │  payment-        │
+         │  processor       │    │  service         │    │  stream          │
+         └────────┬─────────┘    └──────────────────┘    └──────────────────┘
+                  │                       │
+         ┌────────┼───────────┐          │ (disputes)
+         │        │           │          │
+         ▼        ▼           ▼          ▼
+    ┌────────┐ ┌──────┐  ┌────────┐  ┌────────┐
+    │merchant│ │Token │  │loyalty-│  │arbiter │
+    │registry│ │ SAC  │  │program │  │ (EOA)  │
+    └────────┘ └──────┘  └────────┘  └────────┘
+         │         │          │
+         │         ▼          │
+         │    ┌──────────┐   │
+         └───▶│ treasury │◀──┘
+              │(multisig)│
+              └──────────┘
+                    │
+                    ▼
+           ┌─────────────────┐
+           │  Protocol Fees  │
+           │  & Yield Vaults │
+           └─────────────────┘
+
+Legend:
+  ─────▶  Direct contract calls / queries
+  │       Data flow / dependency
+  
+Key Relationships:
+  • payment-processor: checks merchant-registry, moves tokens, accrues loyalty points
+  • escrow-service: holds funds, calls arbiter for disputes
+  • loyalty-program: tracks customer points per merchant
+  • treasury: receives protocol fees, controlled by multisig
+  • merchant-registry: authorizes who can receive payments
+  • payment-stream: continuous per-second payments (subscriptions, payroll)
+```
+
 ### How a sale settles
 
 ```mermaid

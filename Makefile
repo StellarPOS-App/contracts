@@ -1,69 +1,47 @@
-# StellarPOS Smart Contracts Makefile
+# StellarPOS smart contracts
+#
+#   make            build every contract to optimized wasm
+#   make test       run the full test suite
+#   make check      fmt + clippy + test, exactly what CI runs
+#   make deploy     deploy and wire all contracts (NETWORK=testnet by default)
+#   make verify     check deployed contracts match this source (NETWORK=testnet)
 
-.PHONY: help build test clean deploy-testnet deploy-mainnet docs format lint
+NETWORK ?= testnet
+SOURCE  ?= stellarpos-deployer
+FEE_BPS ?= 100
 
-# Default target
+.PHONY: all build test fmt fmt-check lint check clean deploy verify sizes help
+
+all: build
+
 help:
-	@echo "Available targets:"
-	@echo "  build          - Build all contracts"
-	@echo "  build-release  - Build optimized release version"
-	@echo "  test          - Run all tests"
-	@echo "  clean         - Clean build artifacts"
-	@echo "  deploy-testnet - Deploy contracts to testnet"
-	@echo "  deploy-mainnet - Deploy contracts to mainnet"
-	@echo "  docs          - Generate documentation"
-	@echo "  format        - Format code"
-	@echo "  lint          - Run linter"
-	@echo "  setup         - Setup development environment"
+	@grep -E '^#   ' Makefile | sed 's/^#   //'
 
-# Build all contracts
 build:
-	@echo "Building all contracts..."
-	cargo build --target wasm32-unknown-unknown --release
+	stellar contract build
 
-# Build optimized release
-build-release:
-	@echo "Building optimized release..."
-	cargo build --target wasm32-unknown-unknown --release --profile release
-
-# Run all tests
 test:
-	@echo "Running tests..."
-	cargo test
+	cargo test --workspace
 
-# Clean build artifacts
-clean:
-	@echo "Cleaning build artifacts..."
-	cargo clean
+fmt:
+	cargo fmt --all
 
-# Deploy to testnet
-deploy-testnet:
-	@echo "Deploying to testnet..."
-	./scripts/deploy-testnet.sh
+fmt-check:
+	cargo fmt --all -- --check
 
-# Deploy to mainnet  
-deploy-mainnet:
-	@echo "Deploying to mainnet..."
-	./scripts/deploy-mainnet.sh
-
-# Generate documentation
-docs:
-	@echo "Generating documentation..."
-	cargo doc --no-deps --open
-
-# Format code
-format:
-	@echo "Formatting code..."
-	cargo fmt
-
-# Run linter
 lint:
-	@echo "Running linter..."
-	cargo clippy -- -D warnings
+	cargo clippy --workspace --all-targets -- -D warnings
 
-# Setup development environment
-setup:
-	@echo "Setting up development environment..."
-	rustup target add wasm32-unknown-unknown
-	cargo install soroban-cli
-	./scripts/setup-env.sh
+check: fmt-check lint test
+
+sizes: build
+	@ls -l target/wasm32v1-none/release/*.wasm | awk '{printf "%-28s %6d bytes\n", $$9, $$5}' | sed 's|target/wasm32v1-none/release/||'
+
+deploy: build
+	NETWORK=$(NETWORK) SOURCE=$(SOURCE) FEE_BPS=$(FEE_BPS) ./scripts/deploy.sh
+
+verify:
+	NETWORK=$(NETWORK) ./scripts/verify.sh
+
+clean:
+	cargo clean

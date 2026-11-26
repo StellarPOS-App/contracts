@@ -236,6 +236,8 @@ pub struct Config {
     pub fee_bps: u32,
     pub paused: bool,
     pub max_payments_per_block: u32,
+    /// Maximum payment amount allowed (Issue #60: prevent overflow in fee calculations)
+    pub max_payment_amount: i128,
 }
 
 #[contracttype]
@@ -288,6 +290,8 @@ pub enum DataKey {
     Delegation(Address, Address),
     Loyalty,
     MerchantCallback(Address),
+    /// KYC verification status for merchants (Issue #57)
+    MerchantKyc(Address),
     ReentrancyLock,
 }
 
@@ -419,6 +423,7 @@ pub struct ConfigUpdated {
     pub fee_bps: u32,
     pub treasury: Address,
     pub paused: bool,
+    pub max_payment_amount: i128,
     pub event_index: u64,
 }
 
@@ -482,6 +487,7 @@ impl PaymentProcessor {
             fee_bps,
             paused: false,
             max_payments_per_block: DEFAULT_MAX_PAYMENTS_PER_BLOCK,
+            max_payment_amount: i128::MAX, // No limit by default (Issue #60)
         };
         env.storage().instance().set(&DataKey::Config, &config);
         let roles = AdminRoles {
@@ -822,6 +828,38 @@ impl PaymentProcessor {
         extend_instance(&env);
         AdminRolesUpdated { fee_admin, dispute_admin, upgrade_admin }.publish(&env);
         Ok(())
+    }
+
+    /// Sets the maximum payment amount. Admin-only.
+    /// Issue #60: Add maximum payment amount validation
+    pub fn set_max_payment_amount(env: Env, max_amount: i128) -> Result<(), PaymentError> {
+        Self::require_no_governance(&env)?;
+        if max_amount <= 0 {
+            return Err(PaymentError::InvalidAmount);
+        }
+        Self::update(&env, |c| c.max_payment_amount = max_amount)
+    }
+
+    /// Sets the KYC verification status for a merchant. Admin-only.
+    /// Issue #57: Add merchant KYC flag on-chain
+    pub fn set_merchant_kyc(env: Env, merchant: Address, verified: bool) -> Result<(), PaymentError> {
+        let config = Self::config(&env)?;
+        config.admin.require_auth();
+        let key = DataKey::MerchantKyc(merchant);
+        if verified {
+            env.storage().persistent().set(&key, &true);
+            extend_persistent(&env, &key);
+        } else {
+            env.storage().persistent().remove(&key);
+        }
+        Ok(())
+    }
+
+    /// Gets the KYC verification status of a merchant.
+    /// Issue #57: Add merchant KYC flag on-chain
+    pub fn get_merchant_kyc(env: Env, merchant: Address) -> bool {
+        let key = DataKey::MerchantKyc(merchant);
+        env.storage().persistent().get(&key).unwrap_or(false)
     }
 
     pub fn upgrade(env: Env, wasm_hash: BytesN<32>) -> Result<(), PaymentError> {
@@ -1236,6 +1274,10 @@ impl PaymentProcessor {
         royalties: &Vec<RoyaltyShare>,
     ) -> Result<u64, PaymentError> {
         if amount <= 0 { return Err(PaymentError::InvalidAmount); }
+        // Issue #60: Enforce maximum payment amount to prevent overflow in fee calculations
+        if amount > config.max_payment_amount {
+            return Err(PaymentError::InvalidAmount);
+        }
         if order_ref.is_empty() || order_ref.len() > MAX_ORDER_REF_LEN { return Err(PaymentError::InvalidOrderRef); }
         let order_key = DataKey::Order(merchant.clone(), order_ref.clone());
         if is_entry_valid(env, &order_key) {
@@ -1499,6 +1541,7 @@ impl PaymentProcessor {
             fee_bps: config.fee_bps,
             treasury: config.treasury,
             paused: config.paused,
+            max_payment_amount: config.max_payment_amount,
             event_index: Self::next_event_index(env),
         }
         .publish(env);

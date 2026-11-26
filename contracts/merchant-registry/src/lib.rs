@@ -12,12 +12,20 @@
 
 use shared::{extend_instance, extend_persistent};
 use soroban_sdk::{
-    contract, contracterror, contractevent, contractimpl, contracttype, Address, Env, String, Vec,
+    contract, contractclient, contracterror, contractevent, contractimpl, contracttype, Address,
+    Env, String, Vec,
 };
+
+#[contractclient(name = "EscrowClient")]
+pub trait EscrowInterface {
+    fn cancel_for_merchant(env: Env, merchant: Address) -> u32;
+}
 
 /// Maximum number of assets a merchant can accept. Keeps `accepts` cheap.
 pub const MAX_ACCEPTED_ASSETS: u32 = 10;
 pub const MAX_NAME_LEN: u32 = 64;
+/// Cap on merchants per approve_many call, to stay well inside resource limits.
+pub const MAX_BATCH: u32 = 25;
 
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -32,6 +40,7 @@ pub enum RegistryError {
     TooManyAssets = 7,
     DuplicateAsset = 8,
     InvalidStatusTransition = 9,
+    BatchTooLarge = 10,
 }
 
 #[contracttype]
@@ -40,6 +49,7 @@ pub enum MerchantStatus {
     Pending,
     Active,
     Suspended,
+    Deregistered,
 }
 
 #[contracttype]
@@ -64,6 +74,7 @@ enum DataKey {
     Paused,
     MerchantCount,
     Merchant(Address),
+    EscrowService,
 }
 
 #[contractevent]
@@ -83,6 +94,15 @@ pub struct MerchantStatusChanged {
     pub status: MerchantStatus,
 }
 
+/// One compact event for an administrative batch operation. Individual
+/// status events are intentionally not emitted by `approve_many`.
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MerchantBatchStatusChanged {
+    pub requested: u32,
+    pub changed: u32,
+}
+
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MerchantUpdated {
@@ -94,8 +114,30 @@ pub struct MerchantUpdated {
 
 #[contractevent]
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MerchantRejected {
+    #[topic]
+    pub owner: Address,
+}
+
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct MerchantDeregistered {
+    #[topic]
+    pub owner: Address,
+}
+
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PauseToggled {
     pub paused: bool,
+}
+
+#[contractevent]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct WebhookRegistered {
+    #[topic]
+    pub owner: Address,
+    pub url: String,
 }
 
 // Build metadata embedded in the wasm (SEP-0055), so anyone can trace a
@@ -109,6 +151,13 @@ pub struct MerchantRegistry;
 
 #[contractimpl]
 impl MerchantRegistry {
+    /// Initializes the merchant registry.
+    ///
+    /// # Security
+    ///
+    /// In production deployments, `admin` **must** be a multisig contract
+    /// (such as the deployed `treasury` M-of-N multisig) or a Stellar M-of-N
+    /// multisig account rather than a single-key EOA. See `SECURITY.md`.
     pub fn initialize(env: Env, admin: Address) -> Result<(), RegistryError> {
         if env.storage().instance().has(&DataKey::Admin) {
             return Err(RegistryError::AlreadyInitialized);
@@ -201,12 +250,74 @@ impl MerchantRegistry {
         Ok(())
     }
 
+    pub fn register_webhook(env: Env, owner: Address, url: String) -> Result<(), RegistryError> {
+        Self::require_not_paused(&env)?;
+        owner.require_auth();
+        WebhookRegistered { owner, url }.publish(&env);
+        Ok(())
+    }
+
     // ---------------------------------------------------------------------
     // Admin
     // ---------------------------------------------------------------------
 
     pub fn approve(env: Env, owner: Address) -> Result<(), RegistryError> {
         Self::set_status(&env, owner, MerchantStatus::Pending, MerchantStatus::Active)
+    }
+
+    /// Approves a batch of pending merchants in one transaction, e.g. after a
+    /// review session. Owners that are unknown or not pending are skipped,
+    /// so one stale entry does not block the rest. Returns how many were
+    /// approved.
+    pub fn approve_many(env: Env, owners: Vec<Address>) -> Result<u32, RegistryError> {
+        if owners.len() > MAX_BATCH {
+            return Err(RegistryError::BatchTooLarge);
+        }
+        Self::admin(&env)?.require_auth();
+        let mut approved = 0;
+        for owner in owners.iter() {
+            if Self::apply_status_silent(
+                &env,
+                owner,
+                MerchantStatus::Pending,
+                MerchantStatus::Active,
+            )
+            .is_ok()
+            {
+                approved += 1;
+            }
+        }
+        MerchantBatchStatusChanged {
+            requested: owners.len(),
+            changed: approved,
+        }
+        .publish(&env);
+        Ok(approved)
+    }
+
+    /// Declines a pending registration and deletes it, so the applicant can
+    /// fix their details and register again. Active or suspended merchants
+    /// cannot be rejected; suspend them instead, which keeps their history.
+    pub fn reject(env: Env, owner: Address) -> Result<(), RegistryError> {
+        Self::admin(&env)?.require_auth();
+        let merchant = Self::load(&env, &owner)?;
+        if merchant.status != MerchantStatus::Pending {
+            return Err(RegistryError::InvalidStatusTransition);
+        }
+        env.storage()
+            .persistent()
+            .remove(&DataKey::Merchant(owner.clone()));
+        let count: u32 = env
+            .storage()
+            .instance()
+            .get(&DataKey::MerchantCount)
+            .unwrap_or(1);
+        env.storage()
+            .instance()
+            .set(&DataKey::MerchantCount, &count.saturating_sub(1));
+        extend_instance(&env);
+        MerchantRejected { owner }.publish(&env);
+        Ok(())
     }
 
     pub fn suspend(env: Env, owner: Address) -> Result<(), RegistryError> {
@@ -225,6 +336,40 @@ impl MerchantRegistry {
             MerchantStatus::Suspended,
             MerchantStatus::Active,
         )
+    }
+
+    /// Permanently removes a merchant from checkout and asks the configured
+    /// escrow service to return every still-active escrow to its buyer.
+    pub fn deregister(env: Env, owner: Address) -> Result<(), RegistryError> {
+        Self::admin(&env)?.require_auth();
+        let merchant = Self::load(&env, &owner)?;
+        if !matches!(
+            merchant.status,
+            MerchantStatus::Active | MerchantStatus::Suspended
+        ) {
+            return Err(RegistryError::InvalidStatusTransition);
+        }
+        Self::apply_status_unchecked(&env, owner.clone(), MerchantStatus::Deregistered)?;
+        if let Some(escrow) = env.storage().instance().get(&DataKey::EscrowService) {
+            EscrowClient::new(&env, &escrow).cancel_for_merchant(&owner);
+        }
+        MerchantDeregistered { owner }.publish(&env);
+        Ok(())
+    }
+
+    /// Links the escrow service used by `deregister`. It is intentionally an
+    /// explicit deployment step so existing deployments remain compatible.
+    pub fn set_escrow_service(env: Env, escrow: Option<Address>) -> Result<(), RegistryError> {
+        Self::admin(&env)?.require_auth();
+        match escrow {
+            Some(address) => env
+                .storage()
+                .instance()
+                .set(&DataKey::EscrowService, &address),
+            None => env.storage().instance().remove(&DataKey::EscrowService),
+        }
+        extend_instance(&env);
+        Ok(())
     }
 
     pub fn pause(env: Env) -> Result<(), RegistryError> {
@@ -265,6 +410,16 @@ impl MerchantRegistry {
             Ok(m) => m.status == MerchantStatus::Active && m.accepted_assets.contains(&asset),
             Err(_) => false,
         }
+    }
+
+    /// Everything checkout needs in one call: the settlement account if the
+    /// merchant is active and accepts `asset`, otherwise `None`. Replaces an
+    /// `accepts` + `settlement_of` pair, halving cross-contract calls and
+    /// merchant reads per payment.
+    pub fn checkout_target(env: Env, owner: Address, asset: Address) -> Option<Address> {
+        let merchant = Self::load(&env, &owner).ok()?;
+        (merchant.status == MerchantStatus::Active && merchant.accepted_assets.contains(&asset))
+            .then_some(merchant.settlement)
     }
 
     /// Settlement account for an active merchant.
@@ -327,10 +482,34 @@ impl MerchantRegistry {
         to: MerchantStatus,
     ) -> Result<(), RegistryError> {
         Self::admin(env)?.require_auth();
+        Self::apply_status(env, owner, from, to)
+    }
+
+    /// Status change without the auth check, for callers that already
+    /// authorized the admin once (batch operations).
+    fn apply_status(
+        env: &Env,
+        owner: Address,
+        from: MerchantStatus,
+        to: MerchantStatus,
+    ) -> Result<(), RegistryError> {
         let mut merchant = Self::load(env, &owner)?;
         if merchant.status != from {
             return Err(RegistryError::InvalidStatusTransition);
         }
+        merchant.status = to;
+        merchant.updated_at = env.ledger().timestamp();
+        Self::save(env, &merchant);
+        MerchantStatusChanged { owner, status: to }.publish(env);
+        Ok(())
+    }
+
+    fn apply_status_unchecked(
+        env: &Env,
+        owner: Address,
+        to: MerchantStatus,
+    ) -> Result<(), RegistryError> {
+        let mut merchant = Self::load(env, &owner)?;
         merchant.status = to;
         merchant.updated_at = env.ledger().timestamp();
         Self::save(env, &merchant);

@@ -24,8 +24,11 @@ flowchart LR
 - The **payment processor** is the only contract that calls others. It reads
   the registry and, when configured, calls the loyalty program.
 - The **loyalty program** accepts `accrue` only from the merchant itself or
-  from the processor address set by its admin. When the processor calls,
-  Soroban authorizes the calling contract automatically.
+  from a processor on its allowlist (`add_processor` / `remove_processor`,
+  at most 5). Several processors can be allowed at once, so a new one can
+  go live before the old one is retired, and revocation takes effect
+  immediately. When a processor calls, Soroban authorizes the calling
+  contract automatically.
 - The **treasury** is just a recipient from the processor's point of view. It
   never calls out except to pay approved withdrawals.
 - The **escrow service** is standalone. It is used for orders that are not
@@ -61,13 +64,16 @@ check cheap.
 | Key | Storage | Value |
 |---|---|---|
 | `Config` | instance | `admin, registry, treasury, fee_bps, loyalty, paused` |
-| `PaymentCount` | instance | last payment id |
+| `PaymentCount` | instance | number of payments settled |
 | `Payment(id)` | persistent | full payment record |
 | `Order(merchant, order_ref)` | persistent | payment id (the idempotency index) |
 
-**Fees.** `fee = amount * fee_bps / 10_000`, rounded toward zero, capped at
+**Fees.** `fee = amount * fee_bps / 10_000`, rounded half up (a fractional
+part of 0.5 or more rounds away from zero) and floored at 0, capped at
 `MAX_FEE_BPS = 1000` (10%). `quote(amount)` returns `(fee, net)` for checkout
-previews.
+previews. Half-up rounding means truncation can never quietly underpay the
+treasury, and the floor means a computed fee can never be negative and so can
+never be deducted as a payout bonus.
 
 **Refunds** are authorized by the payment's settlement account, because that
 account holds the funds. A refund can be partial and repeated, up to the gross
@@ -76,6 +82,20 @@ absorbs it. That is standard card-network behavior, and it stops refunds
 being used to drain the treasury.
 
 **Status:** `Completed`, then `PartiallyRefunded`, then `Refunded`.
+
+**Payment IDs** are the first 8 bytes of a SHA-256 over the merchant, order
+reference, payer, payment count and ledger sequence, so the next ID cannot be
+predicted from a counter.
+
+**Transfers are verified.** After each transfer the recipient's balance must
+have risen by exactly the amount sent, otherwise the call reverts with
+`TransferFailed`. A token that reports success without moving funds, or that
+skims a fee, cannot settle a payment or a refund.
+
+**Compliance records.** Every sale and refund emits a `ComplianceRecord`
+under the `compliance` topic (plus `kind` and `merchant` topics) carrying the
+payment id, payer, settlement account, asset, amount, fee, order reference and
+ledger timestamp, so a reporting tool needs one subscription for all of them.
 
 ## loyalty-program
 
@@ -107,15 +127,28 @@ Every change is a proposal:
 
 | Action | Effect on execute |
 |---|---|
-| `Withdraw(token, to, amount)` | Pays out. Blocked while frozen. |
+| `Withdraw(token, to, amount)` | Pays out after a one-day timelock. Blocked while frozen. |
 | `AddSigner(addr)` | Max 10 signers, no duplicates |
-| `RemoveSigner(addr)` | Rejected if signers would drop below threshold |
+| `RemoveSigner(addr)` | Rejected if signers would drop below threshold. Cancels every open proposal the removed signer made. |
 | `SetThreshold(n)` | `1 <= n <= signers` |
 | `Unfreeze` | Clears an emergency freeze |
+| `ApproveVault(vault)` / `RevokeVault(vault)` | Allows (up to 5) or stops deposits into a yield vault |
+| `VaultDeposit(vault, token, amount)` | Moves idle funds into an approved vault after a one-day timelock. Blocked while frozen. |
+| `VaultWithdraw(vault, shares)` | Redeems back into the treasury. Allowed while frozen and after revocation. |
 
 - Execution counts approvals only from **current** signers, so a removed
   signer's earlier approvals stop counting.
+- `Withdraw` and `VaultDeposit` are timelocked: they cannot execute until
+  `FUND_MOVEMENT_TIMELOCK_SECS` (one day) after creation. `executable_at(id)`
+  reports the earliest execution timestamp. The delay gives signers time to
+  freeze the treasury if a key is compromised; `VaultWithdraw` and the
+  governance actions execute immediately once approved.
 - Proposals expire 7 days after creation.
+- **Yield vaults** implement `deposit(from, amount) -> shares`,
+  `withdraw(owner, shares) -> amount` and `shares(owner)`. A deposit grants
+  the vault an allowance for exactly `amount`, valid for the current ledger
+  only, so a vault can never pull more than the multisig approved.
+  Withdrawals can only pay back into the treasury.
 - `freeze` needs one signer, while `Unfreeze` needs the full threshold.
   Halting withdrawals is cheap; resuming them takes consensus.
 
@@ -148,6 +181,24 @@ stateDiagram-v2
   be stranded by an absent arbiter.
 - Evidence is a list of up to 10 SHA-256 hashes of off-chain files per
   escrow. No personal data is stored on-chain.
+
+## payment-stream
+
+A payer locks a deposit that unlocks to the recipient linearly between
+`start` and `end`:
+
+```
+streamed(t) = deposit * (min(t, end) - start) / (end - start)
+available   = streamed(t) - withdrawn
+```
+
+- The recipient calls `withdraw` whenever they like for everything accrued.
+- Either party can `cancel` before `end`. The recipient gets the accrued
+  remainder and the payer gets the unearned rest, in the same transaction.
+- Division rounds toward the payer until `end`, when the whole deposit is
+  available, so nothing is left in the contract.
+- `pause` blocks new streams and withdrawals; `cancel` still works, because it
+  only returns funds to their owners.
 
 ## Error codes
 

@@ -6,6 +6,32 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- `payment-processor`: on-chain payment receipt generation with queryable receipts by payment ID (#66).
+- `merchant-registry`: support for multiple accepted token types per merchant via configurable whitelist (#62).
+- `payment-processor`: `pay_with_fee` takes a pre-computed fee and rejects the
+  payment with `FeeMismatch` if it differs from the on-chain computation (#121).
+- `payment-processor`: `set_merchant_callback`, gated by the merchant's
+  authorization (#118).
+- `examples/`: JavaScript integration scripts for checkout, order
+  verification and refunds (#86).
+- `docs/authorization-audit.md`: audit of `require_auth` across all entry
+  points (#118).
+
+### Changed
+- `payment-processor`: payment IDs are a hash of (payer, merchant, amount,
+  timestamp, nonce) with a monotonic nonce that refunds never rewind, so two
+  payments in one ledger cannot collide (#88).
+
+### Fixed
+- `payment-processor`: `pay_delegated` now authenticates the delegatee instead
+  of the contract's own address (#118).
+- Repaired `main`, which did not compile: unresolved merge debris in
+  `payment-processor`, and stale `loyalty-program` and `escrow-service` tests.
+- `shared`: floor computed basis-point fees at 0, so a negative fee can never
+  be deducted and overpay a recipient (#169).
+- `escrow-service`: enforce escrow expiry check in claim function to prevent settlements after agreed window (#65).
+
 ## [0.2.0]
 
 The first version that compiles, tests, and deploys.

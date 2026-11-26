@@ -325,6 +325,9 @@ public issues.
 
 [MIT](LICENSE)
 
+ fix/issue-167-add-coverage-reports-to-ci
+## CI Coverage Reports\n\nThe CI pipeline should generate lcov coverage reports as artifacts, with a gate failing the build if line coverage drops below 80%.
+
  fix/issue-166-optimize-direct-payment-hot-path
 ## Direct Payment Hot Path\n\nA dedicated pay_direct entry point for same-asset payments with no loyalty or escrow can skip registry lookups and fee splits, reducing ledger operations.
 
@@ -347,6 +350,7 @@ public issues.
 ## POS Terms Glossary\n\nA glossary in docs/glossary.md (settlement, escrow, loyalty tier, BPS, SAC, order_ref) helps new contributors understand contract semantics without prior Stellar knowledge.
 
 ## Configurable Royalty Split\n\nMarketplace integrations need a royalty split where a configurable percentage forwards to a creator address, stored per merchant and enforced atomically within the pay entry point.
+ main
  main
  main
  main

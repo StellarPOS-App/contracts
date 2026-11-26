@@ -325,6 +325,9 @@ public issues.
 
 [MIT](LICENSE)
 
+ fix/issue-168-fix-cross-contract-reentrancy
+## Reentrancy via Callback\n\nAny function invoking an external contract must complete all internal state writes before the cross-contract call. Soroban does not prevent reentrancy at the contract level.
+
  fix/issue-167-add-coverage-reports-to-ci
 ## CI Coverage Reports\n\nThe CI pipeline should generate lcov coverage reports as artifacts, with a gate failing the build if line coverage drops below 80%.
 
@@ -350,6 +353,7 @@ public issues.
 ## POS Terms Glossary\n\nA glossary in docs/glossary.md (settlement, escrow, loyalty tier, BPS, SAC, order_ref) helps new contributors understand contract semantics without prior Stellar knowledge.
 
 ## Configurable Royalty Split\n\nMarketplace integrations need a royalty split where a configurable percentage forwards to a creator address, stored per merchant and enforced atomically within the pay entry point.
+ main
  main
  main
  main

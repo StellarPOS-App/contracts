@@ -604,13 +604,34 @@
               "key": {
                 "vec": [
                   {
-                    "symbol": "Order"
+                    "symbol": "EventIndex"
+                  }
+                ]
+              },
+              "durability": "persistent",
+              "val": {
+                "u64": "2"
+              }
+            }
+          },
+          "ext": "v0"
+        },
+        "live_until": 1555200
+      },
+      {
+        "entry": {
+          "last_modified_ledger_seq": 0,
+          "data": {
+            "contract_data": {
+              "ext": "v0",
+              "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARQG5",
+              "key": {
+                "vec": [
+                  {
+                    "symbol": "MerchantPaymentCount"
                   },
                   {
                     "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
-                  },
-                  {
-                    "string": "P"
                   }
                 ]
               },
@@ -634,10 +655,40 @@
               "key": {
                 "vec": [
                   {
+                    "symbol": "Order"
+                  },
+                  {
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
+                  },
+                  {
+                    "string": "P"
+                  }
+                ]
+              },
+              "durability": "persistent",
+              "val": {
+                "u64": "6491328378884108817"
+              }
+            }
+          },
+          "ext": "v0"
+        },
+        "live_until": 1555200
+      },
+      {
+        "entry": {
+          "last_modified_ledger_seq": 0,
+          "data": {
+            "contract_data": {
+              "ext": "v0",
+              "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARQG5",
+              "key": {
+                "vec": [
+                  {
                     "symbol": "Payment"
                   },
                   {
-                    "u64": "1"
+                    "u64": "6491328378884108817"
                   }
                 ]
               },
@@ -681,7 +732,7 @@
                       "symbol": "id"
                     },
                     "val": {
-                      "u64": "1"
+                      "u64": "6491328378884108817"
                     }
                   },
                   {
@@ -795,12 +846,6 @@
                           },
                           {
                             "key": {
-                              "symbol": "loyalty"
-                            },
-                            "val": "void"
-                          },
-                          {
-                            "key": {
                               "symbol": "paused"
                             },
                             "val": {
@@ -830,12 +875,36 @@
                       "key": {
                         "vec": [
                           {
+                            "symbol": "NextPaymentId"
+                          }
+                        ]
+                      },
+                      "val": {
+                        "u64": "1"
+                      }
+                    },
+                    {
+                      "key": {
+                        "vec": [
+                          {
                             "symbol": "PaymentCount"
                           }
                         ]
                       },
                       "val": {
                         "u64": "1"
+                      }
+                    },
+                    {
+                      "key": {
+                        "vec": [
+                          {
+                            "symbol": "ReentrancyLock"
+                          }
+                        ]
+                      },
+                      "val": {
+                        "bool": false
                       }
                     }
                   ]
@@ -1109,13 +1178,104 @@
           "v0": {
             "topics": [
               {
+                "symbol": "compliance"
+              },
+              {
+                "symbol": "payment"
+              },
+              {
+                "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
+              }
+            ],
+            "data": {
+              "map": [
+                {
+                  "key": {
+                    "symbol": "amount"
+                  },
+                  "val": {
+                    "i128": "10000000"
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "asset"
+                  },
+                  "val": {
+                    "address": "CACMVW2KK4H5FZDFF2AUCAKQTEJMZZWJUIZF23XMRVYQBSXYLHZ6BKWN"
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "fee"
+                  },
+                  "val": {
+                    "i128": "0"
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "order_ref"
+                  },
+                  "val": {
+                    "string": "P"
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "payer"
+                  },
+                  "val": {
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAK3IM"
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "payment_id"
+                  },
+                  "val": {
+                    "u64": "6491328378884108817"
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "settlement"
+                  },
+                  "val": {
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAITA4"
+                  }
+                },
+                {
+                  "key": {
+                    "symbol": "timestamp"
+                  },
+                  "val": {
+                    "u64": "0"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "failed_call": false
+    },
+    {
+      "event": {
+        "ext": "v0",
+        "contract_id": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARQG5",
+        "type_": "contract",
+        "body": {
+          "v0": {
+            "topics": [
+              {
                 "symbol": "payment_settled"
               },
               {
                 "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
               },
               {
-                "u64": "1"
+                "u64": "6491328378884108817"
               }
             ],
             "data": {

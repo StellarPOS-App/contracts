@@ -54,10 +54,13 @@
 
 #![no_std]
 
-use shared::{bps_of, extend_instance, extend_persistent, is_entry_valid, split_fee, BPS_DENOMINATOR, MAX_FEE_BPS};
+use shared::{
+    bps_of, extend_instance, extend_persistent, is_entry_valid, split_fee, BPS_DENOMINATOR,
+    MAX_FEE_BPS,
+};
 use soroban_sdk::{
-    contract, contractclient, contracterror, contractevent, contractimpl, contracttype, token,
-    symbol_short, Address, BytesN, Env, Map, String, Symbol, Vec,
+    contract, contractclient, contracterror, contractevent, contractimpl, contracttype,
+    symbol_short, token, Address, BytesN, Env, Map, String, Symbol, Vec,
 };
 
 pub const MAX_ORDER_REF_LEN: u32 = 64;
@@ -462,7 +465,10 @@ impl PaymentProcessor {
         storage.set(&DataKey::CircuitBreakerCurrentVolume, &0i128);
         storage.set(&DataKey::FeesCollected, &0i128);
         storage.set(&DataKey::FeeSweepLastLedger, &0u32);
-        storage.set(&DataKey::FeeSweepInterval, &(7 * shared::DAY_IN_LEDGERS as u32));
+        storage.set(
+            &DataKey::FeeSweepInterval,
+            &(7 * shared::DAY_IN_LEDGERS as u32),
+        );
         extend_instance(&env);
         Ok(())
     }
@@ -505,7 +511,16 @@ impl PaymentProcessor {
         Self::check_circuit_breaker(&env, amount)?;
         let settlement = Self::settlement_for(&env, &config, &merchant, &asset)?;
         Self::settle(
-            &env, &config, &payer, merchant, settlement, &asset, amount, order_ref, category, &Vec::new(&env),
+            &env,
+            &config,
+            &payer,
+            merchant,
+            settlement,
+            &asset,
+            amount,
+            order_ref,
+            category,
+            &Vec::new(&env),
         )
     }
 
@@ -957,7 +972,9 @@ impl PaymentProcessor {
         }
         let config = Self::config(&env)?;
         config.admin.require_auth();
-        env.storage().instance().set(&DataKey::CircuitBreakerMaxTx, &max_amount);
+        env.storage()
+            .instance()
+            .set(&DataKey::CircuitBreakerMaxTx, &max_amount);
         extend_instance(&env);
         Ok(())
     }
@@ -969,7 +986,9 @@ impl PaymentProcessor {
         }
         let config = Self::config(&env)?;
         config.admin.require_auth();
-        env.storage().instance().set(&DataKey::CircuitBreakerMaxVolume, &max_volume);
+        env.storage()
+            .instance()
+            .set(&DataKey::CircuitBreakerMaxVolume, &max_volume);
         extend_instance(&env);
         Ok(())
     }
@@ -978,8 +997,12 @@ impl PaymentProcessor {
     pub fn reset_circuit_breaker(env: Env) -> Result<(), PaymentError> {
         let config = Self::config(&env)?;
         config.admin.require_auth();
-        env.storage().instance().set(&DataKey::CircuitBreakerCurrentVolume, &0i128);
-        env.storage().instance().set(&DataKey::CircuitBreakerLastLedger, &env.ledger().sequence());
+        env.storage()
+            .instance()
+            .set(&DataKey::CircuitBreakerCurrentVolume, &0i128);
+        env.storage()
+            .instance()
+            .set(&DataKey::CircuitBreakerLastLedger, &env.ledger().sequence());
         extend_instance(&env);
         Ok(())
     }
@@ -991,7 +1014,9 @@ impl PaymentProcessor {
         }
         let config = Self::config(&env)?;
         config.admin.require_auth();
-        env.storage().instance().set(&DataKey::FeeSweepInterval, &interval_ledgers);
+        env.storage()
+            .instance()
+            .set(&DataKey::FeeSweepInterval, &interval_ledgers);
         extend_instance(&env);
         Ok(())
     }
@@ -1002,7 +1027,9 @@ impl PaymentProcessor {
         let storage = env.storage().instance();
         let current_ledger = env.ledger().sequence();
         let last_sweep: u32 = storage.get(&DataKey::FeeSweepLastLedger).unwrap_or(0);
-        let sweep_interval: u32 = storage.get(&DataKey::FeeSweepInterval).unwrap_or(7 * shared::DAY_IN_LEDGERS as u32);
+        let sweep_interval: u32 = storage
+            .get(&DataKey::FeeSweepInterval)
+            .unwrap_or(7 * shared::DAY_IN_LEDGERS as u32);
         let fees_collected: i128 = storage.get(&DataKey::FeesCollected).unwrap_or(0);
 
         if fees_collected <= 0 {
@@ -1038,8 +1065,12 @@ impl PaymentProcessor {
     /// Returns the current circuit breaker settings: (max_tx, max_volume, last_ledger_checked).
     pub fn get_circuit_breaker_settings(env: Env) -> (i128, i128, u32) {
         let storage = env.storage().instance();
-        let max_tx = storage.get(&DataKey::CircuitBreakerMaxTx).unwrap_or(i128::MAX);
-        let max_volume = storage.get(&DataKey::CircuitBreakerMaxVolume).unwrap_or(i128::MAX);
+        let max_tx = storage
+            .get(&DataKey::CircuitBreakerMaxTx)
+            .unwrap_or(i128::MAX);
+        let max_volume = storage
+            .get(&DataKey::CircuitBreakerMaxVolume)
+            .unwrap_or(i128::MAX);
         let last_ledger = storage.get(&DataKey::CircuitBreakerLastLedger).unwrap_or(0);
         (max_tx, max_volume, last_ledger)
     }
@@ -1145,8 +1176,14 @@ impl PaymentProcessor {
 
         Self::settlement_for(&env, &config, &merchant, &asset)?;
 
-        let recurring_count = env.storage().instance().get(&DataKey::RecurringCount).unwrap_or(0u64);
-        let id = recurring_count.checked_add(1).ok_or(PaymentError::Overflow)?;
+        let recurring_count = env
+            .storage()
+            .instance()
+            .get(&DataKey::RecurringCount)
+            .unwrap_or(0u64);
+        let id = recurring_count
+            .checked_add(1)
+            .ok_or(PaymentError::Overflow)?;
 
         let recurring = RecurringPayment {
             id,
@@ -1157,13 +1194,19 @@ impl PaymentProcessor {
             interval,
             max_occurrences,
             occurrences: 0,
-            next_payment_time: env.ledger().timestamp().checked_add(interval).ok_or(PaymentError::Overflow)?,
+            next_payment_time: env
+                .ledger()
+                .timestamp()
+                .checked_add(interval)
+                .ok_or(PaymentError::Overflow)?,
             status: RecurringStatus::Active,
             created_at: env.ledger().timestamp(),
         };
 
         let storage = env.storage();
-        storage.persistent().set(&DataKey::RecurringPayment(id), &recurring);
+        storage
+            .persistent()
+            .set(&DataKey::RecurringPayment(id), &recurring);
         extend_persistent(&env, &DataKey::RecurringPayment(id));
         storage.instance().set(&DataKey::RecurringCount, &id);
         extend_instance(&env);
@@ -1183,10 +1226,7 @@ impl PaymentProcessor {
 
     /// Executes the next payment in a recurring schedule if it's due.
     /// Only the merchant or admin can trigger this.
-    pub fn execute_recurring(
-        env: Env,
-        recurring_id: u64,
-    ) -> Result<u64, PaymentError> {
+    pub fn execute_recurring(env: Env, recurring_id: u64) -> Result<u64, PaymentError> {
         let config = Self::config(&env)?;
         if config.paused {
             return Err(PaymentError::Paused);
@@ -1207,7 +1247,8 @@ impl PaymentProcessor {
 
         recurring.merchant.require_auth();
 
-        let settlement = Self::settlement_for(&env, &config, &recurring.merchant, &recurring.asset)?;
+        let settlement =
+            Self::settlement_for(&env, &config, &recurring.merchant, &recurring.asset)?;
         let order_ref = String::from_slice(
             &env,
             format!("recurring-{}-{}", recurring_id, recurring.occurrences).as_bytes(),
@@ -1225,8 +1266,13 @@ impl PaymentProcessor {
             0,
         )?;
 
-        recurring.occurrences = recurring.occurrences.checked_add(1).ok_or(PaymentError::Overflow)?;
-        recurring.next_payment_time = env.ledger().timestamp()
+        recurring.occurrences = recurring
+            .occurrences
+            .checked_add(1)
+            .ok_or(PaymentError::Overflow)?;
+        recurring.next_payment_time = env
+            .ledger()
+            .timestamp()
             .checked_add(recurring.interval)
             .ok_or(PaymentError::Overflow)?;
 
@@ -1247,10 +1293,7 @@ impl PaymentProcessor {
     }
 
     /// Cancels a recurring payment schedule.
-    pub fn cancel_recurring(
-        env: Env,
-        recurring_id: u64,
-    ) -> Result<(), PaymentError> {
+    pub fn cancel_recurring(env: Env, recurring_id: u64) -> Result<(), PaymentError> {
         let mut recurring = Self::load_recurring(&env, recurring_id)?;
         recurring.payer.require_auth();
 
@@ -1261,19 +1304,13 @@ impl PaymentProcessor {
         recurring.status = RecurringStatus::Cancelled;
         Self::save_recurring(&env, &recurring);
 
-        RecurringPaymentCancelled {
-            recurring_id,
-        }
-        .publish(&env);
+        RecurringPaymentCancelled { recurring_id }.publish(&env);
 
         Ok(())
     }
 
     /// Pauses a recurring payment schedule.
-    pub fn pause_recurring(
-        env: Env,
-        recurring_id: u64,
-    ) -> Result<(), PaymentError> {
+    pub fn pause_recurring(env: Env, recurring_id: u64) -> Result<(), PaymentError> {
         let mut recurring = Self::load_recurring(&env, recurring_id)?;
         recurring.payer.require_auth();
 
@@ -1287,10 +1324,7 @@ impl PaymentProcessor {
     }
 
     /// Resumes a paused recurring payment schedule.
-    pub fn resume_recurring(
-        env: Env,
-        recurring_id: u64,
-    ) -> Result<(), PaymentError> {
+    pub fn resume_recurring(env: Env, recurring_id: u64) -> Result<(), PaymentError> {
         let mut recurring = Self::load_recurring(&env, recurring_id)?;
         recurring.payer.require_auth();
 
@@ -1304,10 +1338,7 @@ impl PaymentProcessor {
     }
 
     /// Gets a recurring payment schedule.
-    pub fn get_recurring(
-        env: Env,
-        recurring_id: u64,
-    ) -> Result<RecurringPayment, PaymentError> {
+    pub fn get_recurring(env: Env, recurring_id: u64) -> Result<RecurringPayment, PaymentError> {
         Self::load_recurring(&env, recurring_id)
     }
 
@@ -1402,10 +1433,16 @@ impl PaymentProcessor {
     fn check_circuit_breaker(env: &Env, amount: i128) -> Result<(), PaymentError> {
         let storage = env.storage().instance();
         let current_ledger = env.ledger().sequence();
-        let max_tx: i128 = storage.get(&DataKey::CircuitBreakerMaxTx).unwrap_or(i128::MAX);
-        let max_volume: i128 = storage.get(&DataKey::CircuitBreakerMaxVolume).unwrap_or(i128::MAX);
+        let max_tx: i128 = storage
+            .get(&DataKey::CircuitBreakerMaxTx)
+            .unwrap_or(i128::MAX);
+        let max_volume: i128 = storage
+            .get(&DataKey::CircuitBreakerMaxVolume)
+            .unwrap_or(i128::MAX);
         let last_ledger: u32 = storage.get(&DataKey::CircuitBreakerLastLedger).unwrap_or(0);
-        let mut current_volume: i128 = storage.get(&DataKey::CircuitBreakerCurrentVolume).unwrap_or(0);
+        let mut current_volume: i128 = storage
+            .get(&DataKey::CircuitBreakerCurrentVolume)
+            .unwrap_or(0);
 
         // Check single transaction limit
         if amount > max_tx {
@@ -1426,7 +1463,9 @@ impl PaymentProcessor {
         }
 
         // Check cumulative volume limit
-        let new_volume = current_volume.checked_add(amount).ok_or(PaymentError::Overflow)?;
+        let new_volume = current_volume
+            .checked_add(amount)
+            .ok_or(PaymentError::Overflow)?;
         if new_volume > max_volume {
             CircuitBreakerTriggered {
                 reason: String::from_str(env, "Ledger volume exceeds limit"),
@@ -1492,8 +1531,11 @@ impl PaymentProcessor {
             return Err(PaymentError::DuplicateOrder);
         }
 
-        let discounted_amount = amount.checked_sub(discount).ok_or(PaymentError::InvalidAmount)?;
-        let (fee, net) = split_fee(discounted_amount, config.fee_bps).ok_or(PaymentError::Overflow)?;
+        let discounted_amount = amount
+            .checked_sub(discount)
+            .ok_or(PaymentError::InvalidAmount)?;
+        let (fee, net) =
+            split_fee(discounted_amount, config.fee_bps).ok_or(PaymentError::Overflow)?;
         let token = token::Client::new(env, asset);
         let decimals = Self::cached_decimals(env, asset);
         let id = Self::next_id(env, payer, &merchant, &order_ref)?;

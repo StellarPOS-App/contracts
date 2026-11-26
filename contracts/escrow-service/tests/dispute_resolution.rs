@@ -48,6 +48,7 @@ fn world() -> World<'static> {
         &1_000,
         &(1_000_000 + 3 * DAY),
         &(2 * DAY),
+        &(1_000_000 + 33 * DAY), // expires_at: 30 days after release_at
     );
     World {
         token: token::Client::new(&env, &asset),

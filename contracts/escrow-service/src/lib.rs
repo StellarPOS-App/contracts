@@ -63,6 +63,7 @@ pub enum EscrowError {
     DeadlinePassed = 16,
     InvalidSplit = 17,
     Overflow = 18,
+    EscrowExpired = 19,
 }
 
 #[contracttype]
@@ -116,6 +117,8 @@ pub struct Escrow {
     pub arbitration_window: u64,
     pub status: EscrowStatus,
     pub created_at: u64,
+    /// Maximum time by which the escrow must be claimed, after this it expires.
+    pub expires_at: u64,
 }
 
 impl Escrow {
@@ -282,6 +285,7 @@ impl EscrowService {
         amount: i128,
         release_at: u64,
         arbitration_window: u64,
+        expires_at: u64,
     ) -> Result<u64, EscrowError> {
         Self::require_not_paused(&env)?;
         buyer.require_auth();
@@ -294,6 +298,7 @@ impl EscrowService {
         }
         let now = env.ledger().timestamp();
         if release_at <= now
+            || expires_at <= release_at
             || !(MIN_ARBITRATION_WINDOW..=MAX_ARBITRATION_WINDOW).contains(&arbitration_window)
         {
             return Err(EscrowError::InvalidSchedule);
@@ -315,6 +320,7 @@ impl EscrowService {
             arbitration_window,
             status: EscrowStatus::Funded,
             created_at: now,
+            expires_at,
         };
         Self::save(&env, &escrow);
         env.storage().instance().set(&DataKey::Count, &id);
@@ -343,6 +349,7 @@ impl EscrowService {
         amount: i128,
         release_at: u64,
         arbitration_window: u64,
+        expires_at: u64,
     ) -> Result<u64, EscrowError> {
         seller.require_auth();
         let premium = amount
@@ -362,6 +369,7 @@ impl EscrowService {
             amount,
             release_at,
             arbitration_window,
+            expires_at,
         )?;
         token::Client::new(&env, &asset).transfer(
             &buyer,
@@ -419,8 +427,12 @@ impl EscrowService {
         Self::require_not_paused(&env)?;
         let mut escrow = Self::funded(&env, id)?;
         escrow.seller.require_auth();
-        if env.ledger().timestamp() < escrow.release_at {
+        let now = env.ledger().timestamp();
+        if now < escrow.release_at {
             return Err(EscrowError::ReleaseNotDue);
+        }
+        if now > escrow.expires_at {
+            return Err(EscrowError::EscrowExpired);
         }
         let amount = escrow.remaining();
         Self::payout(&env, &mut escrow, amount, 0, EscrowStatus::Released);

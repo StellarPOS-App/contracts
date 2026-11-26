@@ -6,9 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- `payment-processor`: on-chain payment receipt generation with queryable receipts by payment ID (#66).
+- `merchant-registry`: support for multiple accepted token types per merchant via configurable whitelist (#62).
+
 ### Fixed
 - `shared`: floor computed basis-point fees at 0, so a negative fee can never
   be deducted and overpay a recipient (#169).
+- `escrow-service`: enforce escrow expiry check in claim function to prevent settlements after agreed window (#65).
 
 ## [0.2.0]
 

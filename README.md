@@ -325,6 +325,9 @@ public issues.
 
 [MIT](LICENSE)
 
+ fix/issue-161-add-compliance-report-hook
+## Compliance Report Hook\n\nAn optional on-chain hook address per merchant enables the processor to emit compliance events after each settlement without modifying core contract logic.
+
  fix/issue-160-fix-merchant-payment-count-on-refund
 ## Merchant Payment Count on Refund\n\nThe payment_count metric must be decremented or a refund_count incremented when a refund is processed to avoid inflating reported transaction volume.
 
@@ -332,5 +335,6 @@ public issues.
 ## POS Terms Glossary\n\nA glossary in docs/glossary.md (settlement, escrow, loyalty tier, BPS, SAC, order_ref) helps new contributors understand contract semantics without prior Stellar knowledge.
 
 ## Configurable Royalty Split\n\nMarketplace integrations need a royalty split where a configurable percentage forwards to a creator address, stored per merchant and enforced atomically within the pay entry point.
+ main
  main
  main

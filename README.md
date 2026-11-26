@@ -325,6 +325,9 @@ public issues.
 
 [MIT](LICENSE)
 
+ fix/issue-163-fix-payment-id-predictability
+## Payment ID Uniqueness\n\nPayment IDs from predictable inputs allow a griefing attacker to occupy an ID slot. Use a hash including an unpredictable caller-supplied nonce.
+
  fix/issue-162-add-malicious-token-tests
 ## Malicious Token Testing\n\nThe test suite must include a mock token returning false from transfer or reverting mid-transfer to test behaviour against non-standard SAC implementations.
 
@@ -338,6 +341,7 @@ public issues.
 ## POS Terms Glossary\n\nA glossary in docs/glossary.md (settlement, escrow, loyalty tier, BPS, SAC, order_ref) helps new contributors understand contract semantics without prior Stellar knowledge.
 
 ## Configurable Royalty Split\n\nMarketplace integrations need a royalty split where a configurable percentage forwards to a creator address, stored per merchant and enforced atomically within the pay entry point.
+ main
  main
  main
  main

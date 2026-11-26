@@ -87,9 +87,8 @@ impl Tier {
 pub struct Program {
     /// Points earned per whole unit of the sale asset at Bronze tier.
     pub points_per_unit: u32,
-    /// Smallest-unit amount that counts as one whole unit
-    /// (10_000_000 for 7-decimal Stellar assets).
-    pub unit: i128,
+    /// Token decimals (7 for typical Stellar assets, 0 for whole-unit tokens).
+    pub decimals: u32,
     pub active: bool,
 }
 
@@ -165,7 +164,8 @@ pub struct TierChanged {
 /// Points earned for `amount` at `tier`: whole units times the program rate,
 /// boosted by the tier multiplier. `None` on overflow.
 fn points_for(program: &Program, tier: Tier, amount: i128) -> Option<u64> {
-    let base = amount.checked_mul(program.points_per_unit as i128)? / program.unit;
+    let unit = 10i128.checked_pow(program.decimals)?;
+    let base = amount.checked_mul(program.points_per_unit as i128)? / unit;
     let boosted = base.checked_mul(tier.multiplier_bps() as i128)? / BPS_DENOMINATOR as i128;
     u64::try_from(boosted).ok()
 }
@@ -239,16 +239,11 @@ impl LoyaltyProgram {
 
     /// Processors currently allowed to accrue points.
     pub fn processors(env: Env) -> Vec<Address> {
-        let mut list: Vec<Address> = env
-            .storage()
-            .instance()
+        let storage = env.storage().instance();
+        let mut list: Vec<Address> = storage
             .get(&DataKey::Processors)
             .unwrap_or_else(|| Vec::new(&env));
-        if let Some(legacy) = env
-            .storage()
-            .instance()
-            .get::<_, Address>(&DataKey::Processor)
-        {
+        if let Some(legacy) = storage.get::<_, Address>(&DataKey::Processor) {
             if !list.contains(&legacy) {
                 list.push_front(legacy);
             }
@@ -276,7 +271,7 @@ impl LoyaltyProgram {
         env: Env,
         merchant: Address,
         points_per_unit: u32,
-        unit: i128,
+        decimals: u32,
     ) -> Result<(), LoyaltyError> {
         Self::require_not_paused(&env)?;
         merchant.require_auth();
@@ -284,10 +279,10 @@ impl LoyaltyProgram {
         if env.storage().persistent().has(&key) {
             return Err(LoyaltyError::AlreadyEnrolled);
         }
-        Self::validate_rate(points_per_unit, unit)?;
+        Self::validate_rate(points_per_unit, decimals)?;
         let program = Program {
             points_per_unit,
-            unit,
+            decimals,
             active: true,
         };
         env.storage().persistent().set(&key, &program);
@@ -299,18 +294,18 @@ impl LoyaltyProgram {
         env: Env,
         merchant: Address,
         points_per_unit: u32,
-        unit: i128,
+        decimals: u32,
         active: bool,
     ) -> Result<(), LoyaltyError> {
         merchant.require_auth();
-        Self::validate_rate(points_per_unit, unit)?;
+        Self::validate_rate(points_per_unit, decimals)?;
         let key = DataKey::Program(merchant.clone());
         Self::program(&env, &merchant)?;
         env.storage().persistent().set(
             &key,
             &Program {
                 points_per_unit,
-                unit,
+                decimals,
                 active,
             },
         );
@@ -479,8 +474,9 @@ impl LoyaltyProgram {
 
     /// Stores the allowlist and retires the legacy single-processor key.
     fn save_processors(env: &Env, list: &Vec<Address>) {
-        env.storage().instance().set(&DataKey::Processors, list);
-        env.storage().instance().remove(&DataKey::Processor);
+        let storage = env.storage().instance();
+        storage.set(&DataKey::Processors, list);
+        storage.remove(&DataKey::Processor);
         extend_instance(env);
     }
 
@@ -507,8 +503,8 @@ impl LoyaltyProgram {
         Ok(program)
     }
 
-    fn validate_rate(points_per_unit: u32, unit: i128) -> Result<(), LoyaltyError> {
-        if points_per_unit == 0 || points_per_unit > 1_000 || unit <= 0 {
+    fn validate_rate(points_per_unit: u32, decimals: u32) -> Result<(), LoyaltyError> {
+        if points_per_unit == 0 || points_per_unit > 1_000 || decimals > 18 {
             return Err(LoyaltyError::InvalidRate);
         }
         Ok(())

@@ -47,6 +47,11 @@ fn memo(env: &Env) -> String {
     String::from_str(env, "monthly fee sweep")
 }
 
+/// Moves the ledger past the timelock on a proposal created at genesis.
+fn mature_funds(s: &Setup) {
+    s.env.ledger().set_timestamp(FUND_MOVEMENT_TIMELOCK_SECS);
+}
+
 #[test]
 fn withdrawal_needs_threshold_approvals() {
     let s = setup();
@@ -62,6 +67,7 @@ fn withdrawal_needs_threshold_approvals() {
         Err(Ok(TreasuryError::NotEnoughApprovals))
     );
     assert_eq!(s.t.approve(&s.b, &id), 2);
+    mature_funds(&s);
     s.t.execute(&id);
 
     assert_eq!(s.t.balance(&s.asset), 600);
@@ -110,6 +116,7 @@ fn any_signer_can_freeze_but_unfreeze_needs_quorum() {
     s.t.approve(&s.c, &thaw);
     s.t.execute(&thaw);
     assert!(!s.t.is_frozen());
+    mature_funds(&s);
     s.t.execute(&withdraw);
     assert_eq!(s.t.balance(&s.asset), 900);
 }
@@ -141,10 +148,11 @@ fn signer_rotation_and_removed_signer_approvals_stop_counting() {
     // c approves a withdrawal, then gets removed before it executes.
     let to = Address::generate(&s.env);
     let w = s.t.propose(
-        &s.c,
+        &s.a,
         &Action::Withdraw(s.asset.clone(), to, 10),
         &memo(&s.env),
     );
+    s.t.approve(&s.c, &w);
     let rm =
         s.t.propose(&s.a, &Action::RemoveSigner(s.c.clone()), &memo(&s.env));
     s.t.approve(&d, &rm);
@@ -155,12 +163,45 @@ fn signer_rotation_and_removed_signer_approvals_stop_counting() {
         Err(Ok(TreasuryError::NotEnoughApprovals))
     );
     s.t.approve(&d, &w);
-    assert_eq!(
-        s.t.try_execute(&w),
-        Err(Ok(TreasuryError::NotEnoughApprovals))
+    mature_funds(&s);
+    s.t.execute(&w);
+}
+
+#[test]
+fn removing_a_signer_cancels_their_open_proposals() {
+    let s = setup();
+    let to = Address::generate(&s.env);
+    // c queues a withdrawal that a and b approve, so it would still have
+    // enough valid approvals after c is gone.
+    let w = s.t.propose(
+        &s.c,
+        &Action::Withdraw(s.asset.clone(), to, 10),
+        &memo(&s.env),
     );
     s.t.approve(&s.a, &w);
-    s.t.execute(&w);
+    s.t.approve(&s.b, &w);
+    let other = s.t.propose(&s.b, &Action::Unfreeze, &memo(&s.env));
+
+    let rm =
+        s.t.propose(&s.a, &Action::RemoveSigner(s.c.clone()), &memo(&s.env));
+    s.t.approve(&s.b, &rm);
+    s.t.execute(&rm);
+
+    assert_eq!(s.t.get_proposal(&w).status, ProposalStatus::Cancelled);
+    assert_eq!(s.t.try_execute(&w), Err(Ok(TreasuryError::Cancelled)));
+    assert_eq!(s.t.balance(&s.asset), 1_000);
+    assert_eq!(s.t.get_proposal(&other).status, ProposalStatus::Open);
+}
+
+#[test]
+fn a_signer_can_still_propose_their_own_removal() {
+    let s = setup();
+    let rm =
+        s.t.propose(&s.c, &Action::RemoveSigner(s.c.clone()), &memo(&s.env));
+    s.t.approve(&s.a, &rm);
+    s.t.execute(&rm);
+    assert_eq!(s.t.get_proposal(&rm).status, ProposalStatus::Executed);
+    assert_eq!(s.t.get_signers().len(), 2);
 }
 
 #[test]
@@ -230,8 +271,52 @@ fn overdrawn_withdrawal_fails_cleanly() {
         &memo(&s.env),
     );
     s.t.approve(&s.b, &id);
+    mature_funds(&s);
     assert_eq!(
         s.t.try_execute(&id),
         Err(Ok(TreasuryError::InsufficientBalance))
     );
+}
+
+#[test]
+fn fund_movements_wait_for_the_timelock() {
+    let s = setup();
+    let to = Address::generate(&s.env);
+    let id = s.t.propose(
+        &s.a,
+        &Action::Withdraw(s.asset.clone(), to.clone(), 100),
+        &memo(&s.env),
+    );
+    s.t.approve(&s.b, &id);
+
+    assert_eq!(s.t.executable_at(&id), FUND_MOVEMENT_TIMELOCK_SECS);
+    assert_eq!(
+        s.t.try_execute(&id),
+        Err(Ok(TreasuryError::TimelockNotElapsed))
+    );
+    assert_eq!(s.t.balance(&s.asset), 1_000);
+
+    // One second early is still too early.
+    s.env
+        .ledger()
+        .set_timestamp(FUND_MOVEMENT_TIMELOCK_SECS - 1);
+    assert_eq!(
+        s.t.try_execute(&id),
+        Err(Ok(TreasuryError::TimelockNotElapsed))
+    );
+
+    s.env.ledger().set_timestamp(FUND_MOVEMENT_TIMELOCK_SECS);
+    s.t.execute(&id);
+    assert_eq!(s.t.balance(&s.asset), 900);
+    assert_eq!(token::Client::new(&s.env, &s.asset).balance(&to), 100);
+}
+
+#[test]
+fn non_fund_actions_execute_without_waiting() {
+    let s = setup();
+    let id = s.t.propose(&s.a, &Action::Unfreeze, &memo(&s.env));
+    assert_eq!(s.t.executable_at(&id), 0);
+    s.t.approve(&s.b, &id);
+    s.t.execute(&id);
+    assert_eq!(s.t.get_proposal(&id).status, ProposalStatus::Executed);
 }

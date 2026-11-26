@@ -30,14 +30,20 @@ this checkout, downloads the wasm each contract ID in
 `deployments/<network>.json` is running, and compares SHA-256 hashes. It
 exits non-zero if anything differs. Each contract also embeds SEP-0055
 metadata (`source_repo`, `home_domain`, `desc`) plus the Rust, SDK and CLI
-versions it was built with, readable with
+versions it was built with (Soroban SDK pinned to 27.0.6), readable with
 `stellar contract info meta --wasm <file>` or `--contract-id <id>`.
 
 Anyone can run this against a published manifest to check that a
 deployment runs this source, which is useful before an audit or before
 trusting a mainnet deployment.
 
-## 2. Harden the treasury
+## 2. Harden the treasury and admin
+
+> **Production requirement:** Never leave a single-key deployer EOA as the
+> `admin` of `payment-processor`, `merchant-registry`, `loyalty-program`,
+> `escrow-service`, or `payment-stream` on mainnet. Initialize production
+> contracts with a multisig contract (such as the hardened `treasury` M-of-N
+> multisig) or a Stellar M-of-N multisig account as `admin`.
 
 Before the treasury holds real fees, turn the 1-of-1 deployer setup into a
 real multisig:

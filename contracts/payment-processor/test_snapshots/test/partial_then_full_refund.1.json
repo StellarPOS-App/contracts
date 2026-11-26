@@ -209,7 +209,7 @@
               "function_name": "refund",
               "args": [
                 {
-                  "u64": "1"
+                  "u64": "11403321298867766190"
                 },
                 {
                   "i128": "40000000"
@@ -256,7 +256,7 @@
               "function_name": "refund",
               "args": [
                 {
-                  "u64": "1"
+                  "u64": "11403321298867766190"
                 },
                 {
                   "i128": "60000000"
@@ -670,6 +670,57 @@
               "key": {
                 "vec": [
                   {
+                    "symbol": "EventIndex"
+                  }
+                ]
+              },
+              "durability": "persistent",
+              "val": {
+                "u64": "2"
+              }
+            }
+          },
+          "ext": "v0"
+        },
+        "live_until": 1555200
+      },
+      {
+        "entry": {
+          "last_modified_ledger_seq": 0,
+          "data": {
+            "contract_data": {
+              "ext": "v0",
+              "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARQG5",
+              "key": {
+                "vec": [
+                  {
+                    "symbol": "MerchantPaymentCount"
+                  },
+                  {
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
+                  }
+                ]
+              },
+              "durability": "persistent",
+              "val": {
+                "u64": "0"
+              }
+            }
+          },
+          "ext": "v0"
+        },
+        "live_until": 1555200
+      },
+      {
+        "entry": {
+          "last_modified_ledger_seq": 0,
+          "data": {
+            "contract_data": {
+              "ext": "v0",
+              "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARQG5",
+              "key": {
+                "vec": [
+                  {
                     "symbol": "Order"
                   },
                   {
@@ -682,7 +733,7 @@
               },
               "durability": "persistent",
               "val": {
-                "u64": "1"
+                "u64": "11403321298867766190"
               }
             }
           },
@@ -703,7 +754,7 @@
                     "symbol": "Payment"
                   },
                   {
-                    "u64": "1"
+                    "u64": "11403321298867766190"
                   }
                 ]
               },
@@ -747,7 +798,7 @@
                       "symbol": "id"
                     },
                     "val": {
-                      "u64": "1"
+                      "u64": "11403321298867766190"
                     }
                   },
                   {
@@ -861,12 +912,6 @@
                           },
                           {
                             "key": {
-                              "symbol": "loyalty"
-                            },
-                            "val": "void"
-                          },
-                          {
-                            "key": {
                               "symbol": "paused"
                             },
                             "val": {
@@ -896,12 +941,36 @@
                       "key": {
                         "vec": [
                           {
-                            "symbol": "PaymentCount"
+                            "symbol": "NextPaymentId"
                           }
                         ]
                       },
                       "val": {
                         "u64": "1"
+                      }
+                    },
+                    {
+                      "key": {
+                        "vec": [
+                          {
+                            "symbol": "PaymentCount"
+                          }
+                        ]
+                      },
+                      "val": {
+                        "u64": "0"
+                      }
+                    },
+                    {
+                      "key": {
+                        "vec": [
+                          {
+                            "symbol": "ReentrancyLock"
+                          }
+                        ]
+                      },
+                      "val": {
+                        "bool": false
                       }
                     }
                   ]

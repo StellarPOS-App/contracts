@@ -20,7 +20,7 @@ fn setup() -> Setup<'static> {
     client.initialize(&Address::generate(&env));
     let merchant = Address::generate(&env);
     // 10 points per whole unit spent.
-    client.enroll(&merchant, &10, &UNIT);
+    client.enroll(&merchant, &10, &7);
     Setup {
         customer: Address::generate(&env),
         merchant,
@@ -112,7 +112,7 @@ fn unenrolled_or_inactive_merchant_accrues_nothing() {
     let other = Address::generate(&s.env);
     assert_eq!(s.client.accrue(&other, &other, &s.customer, &UNIT), 0);
 
-    s.client.configure(&s.merchant, &10, &UNIT, &false);
+    s.client.configure(&s.merchant, &10, &7, &false);
     assert_eq!(
         s.client
             .accrue(&s.merchant, &s.merchant, &s.customer, &UNIT),
@@ -138,15 +138,15 @@ fn rate_validation() {
     let s = setup();
     let m = Address::generate(&s.env);
     assert_eq!(
-        s.client.try_enroll(&m, &0, &UNIT),
+        s.client.try_enroll(&m, &0, &7),
         Err(Ok(LoyaltyError::InvalidRate))
     );
     assert_eq!(
-        s.client.try_enroll(&m, &10, &0),
+        s.client.try_enroll(&m, &10, &19),
         Err(Ok(LoyaltyError::InvalidRate))
     );
     assert_eq!(
-        s.client.try_enroll(&s.merchant, &10, &UNIT),
+        s.client.try_enroll(&s.merchant, &10, &7),
         Err(Ok(LoyaltyError::AlreadyEnrolled))
     );
 }

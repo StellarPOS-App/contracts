@@ -1,0 +1,1 @@
+# Core escrow decisions`n`nThis records the baseline architecture boundaries: disputes freeze merchant withdrawals, payment assets follow token-interface abstraction, error identifiers remain stable, and escrow, fee, and dispute choices require ADRs.

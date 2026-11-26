@@ -433,6 +433,10 @@
     [],
     [],
     [],
+    [],
+    [],
+    [],
+    [],
     []
   ],
   "ledger": {
@@ -880,13 +884,37 @@
               "key": {
                 "vec": [
                   {
-                    "symbol": "Order"
+                    "symbol": "MerchantPaymentCount"
                   },
                   {
                     "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
+                  }
+                ]
+              },
+              "durability": "persistent",
+              "val": {
+                "u64": "2"
+              }
+            }
+          },
+          "ext": "v0"
+        },
+        "live_until": 1555200
+      },
+      {
+        "entry": {
+          "last_modified_ledger_seq": 0,
+          "data": {
+            "contract_data": {
+              "ext": "v0",
+              "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARQG5",
+              "key": {
+                "vec": [
+                  {
+                    "symbol": "MerchantPaymentCount"
                   },
                   {
-                    "string": "TAB-1"
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAATYON"
                   }
                 ]
               },
@@ -916,13 +944,43 @@
                     "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
                   },
                   {
+                    "string": "TAB-1"
+                  }
+                ]
+              },
+              "durability": "persistent",
+              "val": {
+                "u64": "11403321298867766190"
+              }
+            }
+          },
+          "ext": "v0"
+        },
+        "live_until": 1555200
+      },
+      {
+        "entry": {
+          "last_modified_ledger_seq": 0,
+          "data": {
+            "contract_data": {
+              "ext": "v0",
+              "contract": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAARQG5",
+              "key": {
+                "vec": [
+                  {
+                    "symbol": "Order"
+                  },
+                  {
+                    "address": "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHK3M"
+                  },
+                  {
                     "string": "TAB-2"
                   }
                 ]
               },
               "durability": "persistent",
               "val": {
-                "u64": "3"
+                "u64": "1490429806709038314"
               }
             }
           },
@@ -952,7 +1010,7 @@
               },
               "durability": "persistent",
               "val": {
-                "u64": "2"
+                "u64": "9155941257369165452"
               }
             }
           },
@@ -973,7 +1031,7 @@
                     "symbol": "Payment"
                   },
                   {
-                    "u64": "1"
+                    "u64": "1490429806709038314"
                   }
                 ]
               },
@@ -985,7 +1043,7 @@
                       "symbol": "amount"
                     },
                     "val": {
-                      "i128": "100000000"
+                      "i128": "300000000"
                     }
                   },
                   {
@@ -1009,7 +1067,7 @@
                       "symbol": "fee"
                     },
                     "val": {
-                      "i128": "1000000"
+                      "i128": "3000000"
                     }
                   },
                   {
@@ -1017,7 +1075,7 @@
                       "symbol": "id"
                     },
                     "val": {
-                      "u64": "1"
+                      "u64": "1490429806709038314"
                     }
                   },
                   {
@@ -1041,7 +1099,7 @@
                       "symbol": "order_ref"
                     },
                     "val": {
-                      "string": "TAB-1"
+                      "string": "TAB-2"
                     }
                   },
                   {
@@ -1101,7 +1159,7 @@
                     "symbol": "Payment"
                   },
                   {
-                    "u64": "2"
+                    "u64": "9155941257369165452"
                   }
                 ]
               },
@@ -1145,7 +1203,7 @@
                       "symbol": "id"
                     },
                     "val": {
-                      "u64": "2"
+                      "u64": "9155941257369165452"
                     }
                   },
                   {
@@ -1229,7 +1287,7 @@
                     "symbol": "Payment"
                   },
                   {
-                    "u64": "3"
+                    "u64": "11403321298867766190"
                   }
                 ]
               },
@@ -1241,7 +1299,7 @@
                       "symbol": "amount"
                     },
                     "val": {
-                      "i128": "300000000"
+                      "i128": "100000000"
                     }
                   },
                   {
@@ -1265,7 +1323,7 @@
                       "symbol": "fee"
                     },
                     "val": {
-                      "i128": "3000000"
+                      "i128": "1000000"
                     }
                   },
                   {
@@ -1273,7 +1331,7 @@
                       "symbol": "id"
                     },
                     "val": {
-                      "u64": "3"
+                      "u64": "11403321298867766190"
                     }
                   },
                   {
@@ -1297,7 +1355,7 @@
                       "symbol": "order_ref"
                     },
                     "val": {
-                      "string": "TAB-2"
+                      "string": "TAB-1"
                     }
                   },
                   {
@@ -1387,12 +1445,6 @@
                           },
                           {
                             "key": {
-                              "symbol": "loyalty"
-                            },
-                            "val": "void"
-                          },
-                          {
-                            "key": {
                               "symbol": "paused"
                             },
                             "val": {
@@ -1422,12 +1474,36 @@
                       "key": {
                         "vec": [
                           {
+                            "symbol": "NextPaymentId"
+                          }
+                        ]
+                      },
+                      "val": {
+                        "u64": "3"
+                      }
+                    },
+                    {
+                      "key": {
+                        "vec": [
+                          {
                             "symbol": "PaymentCount"
                           }
                         ]
                       },
                       "val": {
                         "u64": "3"
+                      }
+                    },
+                    {
+                      "key": {
+                        "vec": [
+                          {
+                            "symbol": "ReentrancyLock"
+                          }
+                        ]
+                      },
+                      "val": {
+                        "bool": false
                       }
                     }
                   ]

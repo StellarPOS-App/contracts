@@ -1,0 +1,1 @@
+# Escrow integrity boundaries`n`nEscrow changes must preserve payment history across upgrades, reject non-terminal re-initiation, enforce canonical signature verification, and expose protocol revenue through read-only views.

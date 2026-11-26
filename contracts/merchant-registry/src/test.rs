@@ -1,7 +1,7 @@
 extern crate std;
 
 use super::*;
-use soroban_sdk::{testutils::Address as _, vec, Env, String};
+use soroban_sdk::{testutils::{Address as _, Ledger}, vec, Env, String};
 
 struct Setup<'a> {
     env: Env,
@@ -139,6 +139,11 @@ fn empty_name_is_rejected() {
         &vec![&s.env],
     );
     assert_eq!(res, Err(Ok(RegistryError::InvalidName)));
+    assert_eq!(s.client.merchant_count(), 0);
+    assert_eq!(
+        s.client.try_get_merchant(&s.owner),
+        Err(Ok(RegistryError::MerchantNotFound))
+    );
 }
 
 #[test]
@@ -155,6 +160,25 @@ fn profile_update_changes_settlement_and_assets() {
     assert_eq!(s.client.settlement_of(&s.owner), new_settlement);
     assert!(s.client.accepts(&s.owner, &xlm));
     assert!(!s.client.accepts(&s.owner, &s.usdc));
+}
+
+#[test]
+fn get_merchant_reads_latest_persistent_profile_after_update() {
+    let s = setup();
+    register(&s);
+    s.client.approve(&s.owner);
+
+    let before = s.client.get_merchant(&s.owner);
+    s.env.ledger().with_mut(|li| li.timestamp += 1);
+    let new_settlement = Address::generate(&s.env);
+    let xlm = Address::generate(&s.env);
+    s.client
+        .update_profile(&s.owner, &new_settlement, &vec![&s.env, xlm.clone()]);
+
+    let after = s.client.get_merchant(&s.owner);
+    assert_ne!(after.updated_at, before.updated_at);
+    assert_eq!(after.settlement, new_settlement);
+    assert_eq!(after.accepted_assets, vec![&s.env, xlm]);
 }
 
 #[test]

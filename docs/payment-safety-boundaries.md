@@ -1,0 +1,1 @@
+# Payment safety boundaries`n`nPayments must define expiry, validate resolver outcomes, and emit settlement notifications only after durable state changes. This establishes the contract checklist for expiry cancellation, resolver result handling, and high-volume validation.
